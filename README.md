@@ -217,3 +217,4 @@ npm run preview
   - **Net Balance: ₹10,800** | **Savings Rate: 72%**
   - Seeding this dataset via Dataset A in Settings reproduces these exact figures.
 - **Academic Year Notation**: The submitted synopsis lists the course as *Session 2025–2028*, while the report certificate notes *2025–2028* and acknowledgement notes *2026–2027*. Both notations are documented and displayed in the Academic Details modal for university review.
+"# personal-expenses-tracker" 
