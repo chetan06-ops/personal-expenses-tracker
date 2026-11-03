@@ -9,7 +9,7 @@ import { Orbit2DFallback } from '../fallback/Orbit2DFallback';
 import { CategoryBreakdownItem } from '../../types';
 import { Eye, Layers } from 'lucide-react';
 
-interface FinancialOrbitSceneProps {
+export interface FinancialOrbitSceneProps {
   netBalance: number;
   totalExpenses: number;
   categoryBreakdown: CategoryBreakdownItem[];
@@ -87,11 +87,12 @@ export const FinancialOrbitScene: React.FC<FinancialOrbitSceneProps> = ({
     />
   );
 
-  if (!hasWebGL || !enable3D || forced2D) {
+  // If WebGL is unavailable, user disabled 3D, or prefers reduced motion, render 2D
+  if (!hasWebGL || !enable3D || forced2D || reducedMotion) {
     return (
       <div className="relative">
         {fallbackView}
-        {hasWebGL && enable3D && (
+        {hasWebGL && enable3D && !reducedMotion && (
           <button
             onClick={() => setForced2D(false)}
             className="absolute top-2 right-2 flex items-center gap-1 text-[11px] bg-slate-800/80 hover:bg-slate-700 text-cyan-300 px-2 py-1 rounded-md border border-slate-700 transition"
@@ -116,6 +117,13 @@ export const FinancialOrbitScene: React.FC<FinancialOrbitSceneProps> = ({
             dpr={[1, 1.5]}
             frameloop={reducedMotion ? 'demand' : 'always'}
             gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+            onCreated={({ gl }) => {
+              gl.domElement.addEventListener('webglcontextlost', (e) => {
+                e.preventDefault();
+                console.warn('WebGL context lost, falling back to 2D');
+                setForced2D(true);
+              });
+            }}
           >
             {/* Ambient and Key Lighting */}
             <ambientLight intensity={0.5} />
@@ -157,7 +165,7 @@ export const FinancialOrbitScene: React.FC<FinancialOrbitSceneProps> = ({
         </button>
       </div>
 
-      {/* Bottom Hint */}
+      {/* Bottom Status Hint */}
       <div className="absolute bottom-2 left-3 pointer-events-none text-[10px] text-slate-500 font-mono flex items-center gap-2">
         <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
         <span>Interactive Financial Orbit • Drag to rotate</span>
@@ -165,3 +173,5 @@ export const FinancialOrbitScene: React.FC<FinancialOrbitSceneProps> = ({
     </div>
   );
 };
+
+export default FinancialOrbitScene;

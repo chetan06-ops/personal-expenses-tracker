@@ -12,27 +12,52 @@ import {
   calculateFinancialSummary,
   calculateDailySpending,
 } from '../../services/calculations/financialCalculations';
-import { formatINR, formatSignedINR } from '../../utils/currency';
+import { formatINR } from '../../utils/currency';
+import { getDateRangeForPeriod, formatDisplayDate, getTodayDateString } from '../../utils/date';
 import { generateTransactionsCsv, downloadCsvFile } from '../../services/export/csvExport';
 import {
   BarChart3,
   Download,
   Calendar,
-  TrendingDown,
-  TrendingUp,
   Award,
-  Layers,
+  AlertCircle,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 export const ReportsPage: React.FC = () => {
   const [period, setPeriod] = useState<FilterPeriod>('this-month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [dateError, setDateError] = useState<string | null>(null);
+
+  // Validate custom date range
+  const handleStartDateChange = (val: string) => {
+    setCustomStart(val);
+    if (customEnd && val > customEnd) {
+      setDateError('Start date cannot be after end date.');
+    } else {
+      setDateError(null);
+    }
+  };
+
+  const handleEndDateChange = (val: string) => {
+    setCustomEnd(val);
+    if (customStart && customStart > val) {
+      setDateError('Start date cannot be after end date.');
+    } else {
+      setDateError(null);
+    }
+  };
+
+  // Compute active date range
+  const activeRange = useMemo(() => {
+    return getDateRangeForPeriod(period, customStart, customEnd);
+  }, [period, customStart, customEnd]);
 
   const { transactions, allTransactions } = useTransactions({
     period,
-    customStartDate: customStart,
-    customEndDate: customEnd,
+    customStartDate: dateError ? undefined : customStart,
+    customEndDate: dateError ? undefined : customEnd,
   });
 
   const { categoriesMap } = useCategories();
@@ -60,48 +85,113 @@ export const ReportsPage: React.FC = () => {
 
   const handleExportReport = () => {
     const csv = generateTransactionsCsv(transactions);
-    downloadCsvFile(csv, `financial-report-${period}.csv`);
+    const rangeTag =
+      period === 'custom' && customStart && customEnd
+        ? `${customStart}-to-${customEnd}`
+        : period;
+    downloadCsvFile(csv, `financial-report-${rangeTag}.csv`);
   };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Top Filter and Export Bar */}
-      <Card className="p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-cyan-400" />
-            <span>Financial Reports & Analytics</span>
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Comprehensive cash flow distributions and categorical trend models
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
-            {periods.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setPeriod(p.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                  period === p.id
-                    ? 'bg-cyan-500 text-white font-semibold'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
+      <Card className="p-4 sm:p-5">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-cyan-400" />
+              <span>Financial Reports & Analytics</span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Comprehensive cash flow distributions and categorical trend models
+            </p>
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<Download className="w-4 h-4" />}
-            onClick={handleExportReport}
-          >
-            Export Report CSV
-          </Button>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+              {periods.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    setPeriod(p.id);
+                    if (p.id === 'custom' && !customStart) {
+                      setCustomStart(activeRange.startDate);
+                      setCustomEnd(activeRange.endDate);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                    period === p.id
+                      ? 'bg-cyan-500 text-white font-semibold shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<Download className="w-4 h-4" />}
+              onClick={handleExportReport}
+              disabled={transactions.length === 0}
+            >
+              Export Report CSV
+            </Button>
+          </div>
+        </div>
+
+        {/* Custom Date Range Picker Toolbar */}
+        {period === 'custom' && (
+          <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-cyan-400" />
+                <span className="font-medium text-slate-300">From Date:</span>
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-slate-300">To Date:</span>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                />
+              </div>
+
+              <span className="text-[11px] text-slate-400">
+                ({transactions.length} record{transactions.length !== 1 ? 's' : ''} in range)
+              </span>
+            </div>
+
+            {dateError && (
+              <p className="text-xs text-rose-400 flex items-center gap-1.5 pt-1 font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{dateError}</span>
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Active Range Banner */}
+        <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
+          <span>
+            Active Reporting Period:{' '}
+            <span className="text-slate-200 font-medium">
+              {formatDisplayDate(activeRange.startDate)} to {formatDisplayDate(activeRange.endDate)}
+            </span>
+          </span>
+          <Badge variant="cyan" size="sm">
+            {transactions.length} Transactions
+          </Badge>
         </div>
       </Card>
 
@@ -163,9 +253,12 @@ export const ReportsPage: React.FC = () => {
           <Card className="p-5 h-full">
             <CardHeader className="flex items-center justify-between">
               <div>
-                <CardTitle>Income vs. Expense Progression</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <span>Cash Flow Progression</span>
+                  <Badge variant="slate" size="sm">All-Time View</Badge>
+                </CardTitle>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Multi-month cash flow balance and expenditure trajectories
+                  Multi-month cash flow balance and expenditure trajectories across entire history
                 </p>
               </div>
             </CardHeader>
@@ -179,9 +272,9 @@ export const ReportsPage: React.FC = () => {
           <Card className="p-5 h-full flex flex-col justify-between">
             <CardHeader className="flex items-center justify-between">
               <div>
-                <CardTitle>Category Breakdown</CardTitle>
+                <CardTitle>Category Distribution</CardTitle>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Proportional share of total expenditures
+                  Proportional share of expenditures in active period
                 </p>
               </div>
             </CardHeader>
@@ -203,13 +296,13 @@ export const ReportsPage: React.FC = () => {
             <h3 className="text-sm font-bold text-white">Expense Category Ranking</h3>
           </div>
           <span className="text-xs text-slate-400 font-mono">
-            Sorted by total spending
+            Sorted by total spending in period
           </span>
         </div>
 
         {summary.categoryBreakdown.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-500">
-            No expense records found for this period.
+            No expense records found for this reporting period.
           </div>
         ) : (
           <div className="overflow-x-auto">

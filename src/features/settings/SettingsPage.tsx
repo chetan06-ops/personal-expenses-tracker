@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Select } from '../../components/ui/Select';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
@@ -11,7 +10,11 @@ import { useTransactions } from '../../hooks/useTransactions';
 import { useBudgets } from '../../hooks/useBudgets';
 import { useCategories } from '../../hooks/useCategories';
 import { showToast } from '../../hooks/useToast';
-import { seedAcademicData } from '../../database/seed';
+import {
+  seedAcademicReferenceData,
+  seedExtendedDemoData,
+  clearDemoDataOnly,
+} from '../../database/seed';
 import { db } from '../../database/db';
 import { generateTransactionsCsv, downloadCsvFile } from '../../services/export/csvExport';
 import { createFullApplicationBackup, downloadJsonBackup } from '../../services/export/jsonBackup';
@@ -25,13 +28,13 @@ import {
   Database,
   Trash2,
   RefreshCw,
-  ShieldCheck,
   GraduationCap,
   Sparkles,
-  AlertTriangle,
   FileSpreadsheet,
   FileCode,
   HardDrive,
+  Eraser,
+  Layers,
 } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
@@ -45,7 +48,6 @@ export const SettingsPage: React.FC = () => {
   );
 
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
-  const [isSeedConfirmOpen, setIsSeedConfirmOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // CSV Import State
@@ -173,16 +175,15 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  // Academic Test Data Seed
-  const handleLoadAcademicData = async () => {
+  // Academic Reference Data Seed (Dataset A)
+  const handleLoadAcademicData = async (mode: 'append' | 'replace') => {
     try {
       setIsProcessing(true);
-      await seedAcademicData();
-      setIsSeedConfirmOpen(false);
+      const res = await seedAcademicReferenceData(mode);
       showToast({
         type: 'success',
-        title: 'Academic Data Loaded',
-        description: 'Loaded reference test dataset from Project Report Table 7.3.',
+        title: 'Academic Dataset Loaded',
+        description: res.message,
       });
     } catch (err: any) {
       showToast({
@@ -195,7 +196,49 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  // Reset Database
+  // Extended Demo Data Seed (Dataset B)
+  const handleLoadExtendedData = async (mode: 'append' | 'replace') => {
+    try {
+      setIsProcessing(true);
+      const res = await seedExtendedDemoData(mode);
+      showToast({
+        type: 'success',
+        title: 'Extended Dataset Loaded',
+        description: res.message,
+      });
+    } catch (err: any) {
+      showToast({
+        type: 'error',
+        title: 'Seed Error',
+        description: err.message,
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Clear Demo Data Only (Preserves user transactions)
+  const handleClearDemoOnly = async () => {
+    try {
+      setIsProcessing(true);
+      const res = await clearDemoDataOnly();
+      showToast({
+        type: 'info',
+        title: 'Demo Data Removed',
+        description: `Removed ${res.removedCount} demo transactions. Your genuine transactions remain untouched.`,
+      });
+    } catch (err: any) {
+      showToast({
+        type: 'error',
+        title: 'Error',
+        description: err.message,
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Reset Entire Database
   const handleResetDatabase = async () => {
     try {
       setIsProcessing(true);
@@ -338,7 +381,7 @@ export const SettingsPage: React.FC = () => {
               <span>CSV Spreadsheet Data</span>
             </div>
             <p className="text-xs text-slate-400">
-              Export transactions to CSV with formula injection defense, or import spreadsheets from previous tracking registers.
+              Export transactions to CSV with formula injection defense, or import spreadsheets with row-level validation.
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               <Button
@@ -374,7 +417,7 @@ export const SettingsPage: React.FC = () => {
               <span>Full Database JSON Backup</span>
             </div>
             <p className="text-xs text-slate-400">
-              Export complete application state (transactions, custom categories, budgets, and settings) or restore from an existing backup.
+              Export complete application state or atomically restore with strict validation and merge/replace controls.
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               <Button
@@ -408,8 +451,8 @@ export const SettingsPage: React.FC = () => {
         <div className="mt-4 p-3 rounded-xl bg-slate-900/40 border border-slate-800/60 flex items-start gap-3">
           <HardDrive className="w-4 h-4 text-cyan-400 mt-0.5 shrink-0" />
           <p className="text-xs text-slate-400 leading-relaxed">
-            <span className="font-semibold text-slate-300">Local-First Storage Notice: </span>
-            All financial transactions are stored locally inside your browser via IndexedDB (Dexie). No data is sent to external servers or cloud services. Regularly download a JSON backup to protect your records against browser cache clearing.
+            <span className="font-semibold text-slate-300">Local Browser Storage Notice: </span>
+            Financial transactions are stored in your device's browser via IndexedDB (Dexie). Browser storage is private to this machine and profile, but not encrypted by the application. Regularly download a JSON backup to protect your records against cache resets.
           </p>
         </div>
       </Card>
@@ -420,44 +463,116 @@ export const SettingsPage: React.FC = () => {
           <div>
             <CardTitle className="flex items-center gap-2">
               <GraduationCap className="w-5 h-5 text-cyan-400" />
-              <span>Academic Demonstration Tools</span>
+              <span>Academic Demonstration Datasets</span>
             </CardTitle>
             <CardDescription>
-              Verify test cases and reset test datasets according to BCA-308 project guidelines.
+              Explicitly load or clear sample data for evaluating the application and verifying academic test cases. Seeding is completely idempotent and will never duplicate entries.
             </CardDescription>
           </div>
         </CardHeader>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
-            <p className="text-xs font-bold text-slate-200">Load Academic Test Data</p>
-            <p className="text-xs text-slate-400">
-              Populates the database with the exact test dataset described in Chapter 7 Table 7.3 of the university project report (Allowance ₹15,000, Education ₹2,500, Food ₹1,200, Travel ₹500, Balance ₹10,800).
-            </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          {/* Dataset A: Academic Reference Dataset */}
+          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-white">Dataset A: Academic Reference</span>
+                <Badge variant="cyan" size="sm">Table 7.3 • 4 Records</Badge>
+              </div>
+              <p className="text-xs text-slate-400">
+                Exact baseline dataset from the BCA-308 report: Allowance ₹15,000, Education ₹2,500, Food ₹1,200, Travel ₹500. Expected Net Balance: ₹10,800.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button
+                variant="primary"
+                size="sm"
+                leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+                onClick={() => handleLoadAcademicData('append')}
+                disabled={isProcessing}
+              >
+                Append Dataset
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleLoadAcademicData('replace')}
+                disabled={isProcessing}
+                title="Clears only previous academic demo records before adding"
+              >
+                Replace Demo Data
+              </Button>
+            </div>
+          </div>
+
+          {/* Dataset B: Extended Visual Demo */}
+          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-white">Dataset B: Extended Visualization</span>
+                <Badge variant="violet" size="sm">Multi-Category & Multi-Month</Badge>
+              </div>
+              <p className="text-xs text-slate-400">
+                Additional records across Entertainment, Bills, Shopping, Health, and Freelance across October and November to populate 3D Orbit and charts.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<Layers className="w-3.5 h-3.5" />}
+                onClick={() => handleLoadExtendedData('append')}
+                disabled={isProcessing}
+              >
+                Append Demo Records
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleLoadExtendedData('replace')}
+                disabled={isProcessing}
+              >
+                Replace Demo Records
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Maintenance / Clear Actions */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-4 border-t border-white/5">
+          <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-900/50 border border-slate-800">
+            <div>
+              <p className="text-xs font-semibold text-slate-200">Clear Demo Data Only</p>
+              <p className="text-[11px] text-slate-400">
+                Removes all sample records without touching your real transactions
+              </p>
+            </div>
             <Button
-              variant="primary"
+              variant="outline"
               size="sm"
-              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
-              onClick={() => setIsSeedConfirmOpen(true)}
-              className="mt-2"
+              leftIcon={<Eraser className="w-3.5 h-3.5" />}
+              onClick={handleClearDemoOnly}
+              disabled={isProcessing}
             >
-              Load Test Dataset
+              Clear Demo
             </Button>
           </div>
 
-          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
-            <p className="text-xs font-bold text-rose-300">Reset Application Database</p>
-            <p className="text-xs text-slate-400">
-              Clears all saved transaction records and custom budgets for a clean slate or new testing cycle.
-            </p>
+          <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-900/50 border border-rose-500/20">
+            <div>
+              <p className="text-xs font-semibold text-rose-300">Reset Entire Database</p>
+              <p className="text-[11px] text-slate-400">
+                Deletes all stored transactions and custom budgets
+              </p>
+            </div>
             <Button
               variant="danger"
               size="sm"
               leftIcon={<Trash2 className="w-3.5 h-3.5" />}
               onClick={() => setIsResetConfirmOpen(true)}
-              className="mt-2"
+              disabled={isProcessing}
             >
-              Reset Database
+              Reset All
             </Button>
           </div>
         </div>
@@ -495,8 +610,8 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             {csvResultModal.errors.length > 0 && (
-              <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 max-h-32 overflow-y-auto space-y-1 text-rose-300">
-                <p className="font-semibold text-rose-200">Error Details:</p>
+              <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 max-h-36 overflow-y-auto space-y-1 text-rose-300">
+                <p className="font-semibold text-rose-200">Validation Errors:</p>
                 {csvResultModal.errors.map((err, i) => (
                   <p key={i}>• {err}</p>
                 ))}
@@ -578,18 +693,6 @@ export const SettingsPage: React.FC = () => {
           </div>
         </Modal>
       )}
-
-      {/* Academic Test Seed Confirmation */}
-      <ConfirmDialog
-        isOpen={isSeedConfirmOpen}
-        onClose={() => setIsSeedConfirmOpen(false)}
-        onConfirm={handleLoadAcademicData}
-        title="Load Academic Test Dataset"
-        message="This will add the reference test transactions and budgets from Table 7.3 of the BCA-308 project report (Allowance ₹15,000, Education ₹2,500, Food ₹1,200, Travel ₹500). Continue?"
-        confirmText="Load Dataset"
-        variant="primary"
-        isLoading={isProcessing}
-      />
 
       {/* Reset Confirmation */}
       <ConfirmDialog

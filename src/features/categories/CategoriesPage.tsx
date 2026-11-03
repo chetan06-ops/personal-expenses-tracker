@@ -56,14 +56,17 @@ export const CategoriesPage: React.FC = () => {
   };
 
   const handleInitiateDelete = async (cat: Category) => {
-    const count = await getUsageCount(cat.name);
+    const count = await getUsageCount(cat.name, cat.type);
     setUsageCount(count);
     setCategoryToDelete(cat);
 
-    // Pick first candidate for reassignment
-    const candidates = displayedCategories.filter((c) => c.id !== cat.id);
+    // Pick first candidate for reassignment from the same transaction type
+    const sameTypeCategories = cat.type === 'expense' ? expenseCategories : incomeCategories;
+    const candidates = sameTypeCategories.filter((c) => c.id !== cat.id);
     if (candidates.length > 0) {
       setReassignCategoryName(candidates[0].name);
+    } else {
+      setReassignCategoryName('');
     }
   };
 
@@ -278,7 +281,7 @@ export const CategoriesPage: React.FC = () => {
               onChange={(e) => setReassignCategoryName(e.target.value)}
               required
             >
-              {displayedCategories
+              {(categoryToDelete?.type === 'expense' ? expenseCategories : incomeCategories)
                 .filter((c) => c.id !== categoryToDelete?.id)
                 .map((c) => (
                   <option key={c.id} value={c.name} className="bg-slate-900 text-white">

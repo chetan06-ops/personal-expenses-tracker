@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, Suspense, lazy } from 'react';
 import { StatCard } from './StatCard';
-import { FinancialOrbitScene } from '../../three/scenes/FinancialOrbitScene';
+import { Orbit2DFallback } from '../../three/fallback/Orbit2DFallback';
 import { CategoryPieChart } from '../../components/charts/CategoryPieChart';
 import { IncomeExpenseBarChart } from '../../components/charts/IncomeExpenseBarChart';
 import { Card, CardHeader, CardTitle } from '../../components/ui/Card';
@@ -25,8 +25,14 @@ import {
   ArrowRight,
   AlertTriangle,
   Receipt,
+  Sparkles,
   Tag,
 } from 'lucide-react';
+
+// Lazy-load the heavy 3D scene bundle for optimal performance and fast initial load
+const FinancialOrbitScene = lazy(
+  () => import('../../three/scenes/FinancialOrbitScene').then((m) => ({ default: m.FinancialOrbitScene }))
+);
 
 interface DashboardPageProps {
   onOpenAddModal: () => void;
@@ -124,6 +130,28 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         )}
       </div>
 
+      {/* Empty State Welcome Card for First-Time Users */}
+      {allTransactions.length === 0 && (
+        <div className="p-6 rounded-2xl glass-card border border-cyan-500/30 bg-gradient-to-r from-cyan-950/30 via-slate-900/50 to-blue-950/30 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-5">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0 border border-cyan-500/30">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white">Welcome to Personal Expenses Tracker</h3>
+              <p className="text-xs text-slate-300 mt-1 max-w-xl">
+                Your local database is clean and ready. Add your first income or expense to begin tracking cash flows, budgets, and the 3D Financial Orbit.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <Button variant="primary" size="sm" onClick={onOpenAddModal} leftIcon={<PlusCircle className="w-4 h-4" />}>
+              Add First Transaction
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Primary Financial Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -213,13 +241,23 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             </CardHeader>
 
             <div className="flex-1 mt-2 min-h-[300px]">
-              <FinancialOrbitScene
-                netBalance={summary.netBalance}
-                totalExpenses={summary.totalExpenses}
-                categoryBreakdown={summary.categoryBreakdown}
-                enable3D={settings.enable3D}
-                performanceMode={settings.performanceMode}
-              />
+              <Suspense
+                fallback={
+                  <Orbit2DFallback
+                    netBalance={summary.netBalance}
+                    totalExpenses={summary.totalExpenses}
+                    categoryBreakdown={summary.categoryBreakdown}
+                  />
+                }
+              >
+                <FinancialOrbitScene
+                  netBalance={summary.netBalance}
+                  totalExpenses={summary.totalExpenses}
+                  categoryBreakdown={summary.categoryBreakdown}
+                  enable3D={settings.enable3D}
+                  performanceMode={settings.performanceMode}
+                />
+              </Suspense>
             </div>
           </Card>
         </div>

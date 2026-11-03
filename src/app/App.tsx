@@ -11,8 +11,7 @@ import { BudgetsPage } from '../features/budgets/BudgetsPage';
 import { ReportsPage } from '../features/reports/ReportsPage';
 import { CategoriesPage } from '../features/categories/CategoriesPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
-import { initializeDatabase, db } from '../database/db';
-import { seedAcademicData } from '../database/seed';
+import { initializeDatabase } from '../database/db';
 import { useTransactions } from '../hooks/useTransactions';
 import { Transaction } from '../types';
 
@@ -27,15 +26,10 @@ export const App: React.FC = () => {
 
   const { addTransaction, updateTransaction } = useTransactions();
 
-  // Initialize DB and seed demo data on initial launch if completely empty
+  // Initialize DB tables and default categories/settings on initial launch
   useEffect(() => {
     async function init() {
       await initializeDatabase();
-      const count = await db.transactions.count();
-      if (count === 0) {
-        // Automatically seed academic test dataset on first load for instant rich experience
-        await seedAcademicData();
-      }
     }
     init();
   }, []);

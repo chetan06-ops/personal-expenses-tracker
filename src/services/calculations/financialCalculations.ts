@@ -80,7 +80,9 @@ export function calculateFinancialSummary(
 
   const categoryBreakdown: CategoryBreakdownItem[] = Array.from(categoryExpensesMap.entries())
     .map(([catName, stats], index) => {
-      const catObj = categoriesMap?.get(catName);
+      const catObj =
+        categoriesMap?.get(`expense:${catName.toLowerCase()}`) ||
+        categoriesMap?.get(catName);
       const color = catObj?.color || defaultColors[index % defaultColors.length];
       const percentage = totalExpenses > 0 ? (stats.amount / totalExpenses) * 100 : 0;
 

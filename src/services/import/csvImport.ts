@@ -1,5 +1,6 @@
 import { Transaction, TransactionType } from '../../types';
-import { rupeesToPaise } from '../../utils/currency';
+import { rupeesToPaise, VALID_INR_AMOUNT_REGEX } from '../../utils/currency';
+import { isValidCalendarDate } from '../../utils/date';
 
 export interface CsvImportResult {
   totalRows: number;
@@ -11,17 +12,24 @@ export interface CsvImportResult {
 }
 
 /**
- * Parses raw CSV text into a 2D array of rows and columns, handling quotes and line breaks.
+ * Parses raw CSV text into a 2D array of rows and columns,
+ * handling quotes, escaped quotes (""), embedded commas, line breaks, and UTF-8 BOM.
  */
-function parseCsvRows(csvText: string): string[][] {
+export function parseCsvRows(csvText: string): string[][] {
+  // Strip UTF-8 BOM if present
+  let cleanText = csvText;
+  if (cleanText.charCodeAt(0) === 0xfeff) {
+    cleanText = cleanText.substring(1);
+  }
+
   const lines: string[][] = [];
   let currentRow: string[] = [];
   let currentField = '';
   let insideQuotes = false;
 
-  for (let i = 0; i < csvText.length; i++) {
-    const char = csvText[i];
-    const nextChar = csvText[i + 1];
+  for (let i = 0; i < cleanText.length; i++) {
+    const char = cleanText[i];
+    const nextChar = cleanText[i + 1];
 
     if (char === '"') {
       if (insideQuotes && nextChar === '"') {
@@ -59,27 +67,33 @@ function parseCsvRows(csvText: string): string[][] {
 }
 
 /**
- * Normalizes date to YYYY-MM-DD format (supports DD-MM-YYYY or YYYY-MM-DD)
+ * Normalizes date to YYYY-MM-DD format and validates real calendar existence.
+ * Supports DD-MM-YYYY or YYYY-MM-DD.
  */
-function normalizeDate(raw: string): string | null {
+export function normalizeAndValidateDate(raw: string): string | null {
+  if (!raw || typeof raw !== 'string') return null;
   const clean = raw.trim();
-  // Check YYYY-MM-DD
+
+  // Case 1: YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
-    return clean;
+    return isValidCalendarDate(clean) ? clean : null;
   }
-  // Check DD-MM-YYYY
+
+  // Case 2: DD-MM-YYYY or DD/MM/YYYY
   const dmyMatch = clean.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
   if (dmyMatch) {
     const day = dmyMatch[1].padStart(2, '0');
     const month = dmyMatch[2].padStart(2, '0');
     const year = dmyMatch[3];
-    return `${year}-${month}-${day}`;
+    const formatted = `${year}-${month}-${day}`;
+    return isValidCalendarDate(formatted) ? formatted : null;
   }
+
   return null;
 }
 
 /**
- * Imports and validates transactions from CSV content.
+ * Imports and strictly validates transactions from CSV text.
  */
 export function parseAndValidateCsv(
   csvText: string,
@@ -119,10 +133,15 @@ export function parseAndValidateCsv(
     };
   }
 
-  // Set up duplicate tracking
+  // Set up duplicate tracking against existing records
   const existingKeys = new Set(
     existingTransactions.map((t) => `${t.date}_${t.amount}_${t.category.toLowerCase()}_${t.type}`)
   );
+  const existingIds = new Set(existingTransactions.map((t) => t.id));
+
+  // Set up internal duplicate tracking within the CSV file itself
+  const fileInternalKeys = new Set<string>();
+  const fileInternalIds = new Set<string>();
 
   const importedTransactions: Transaction[] = [];
   const errors: string[] = [];
@@ -132,63 +151,105 @@ export function parseAndValidateCsv(
     const row = rows[i];
     const rowNum = i + 1;
 
-    // Type
-    let type: TransactionType = 'expense';
+    // Validate Transaction Type strictly — never default unknown types to expense!
+    let type: TransactionType | null = null;
     if (typeIdx !== -1 && row[typeIdx]) {
       const rawType = row[typeIdx].toLowerCase().trim();
-      if (rawType.includes('inc') || rawType === '+') {
+      if (rawType === 'income' || rawType === 'in' || rawType === 'credit' || rawType === '+') {
         type = 'income';
-      } else if (rawType.includes('exp') || rawType === '-') {
+      } else if (
+        rawType === 'expense' ||
+        rawType === 'out' ||
+        rawType === 'debit' ||
+        rawType === '-'
+      ) {
         type = 'expense';
+      } else {
+        errors.push(
+          `Row ${rowNum}: Invalid transaction type "${row[typeIdx]}". Must be "Income" or "Expense".`
+        );
+        continue;
       }
+    } else {
+      errors.push(`Row ${rowNum}: Transaction type is missing or required.`);
+      continue;
     }
 
-    // Amount
-    const rawAmount = row[amountIdx]?.replace(/[^\d.-]/g, '');
-    const numAmount = parseFloat(rawAmount);
-    if (!rawAmount || isNaN(numAmount) || numAmount <= 0) {
-      errors.push(`Row ${rowNum}: Invalid or non-positive amount "${row[amountIdx]}".`);
+    // Validate Amount strictly
+    const rawAmountStr = (row[amountIdx] || '').trim().replace(/,/g, '');
+    if (!VALID_INR_AMOUNT_REGEX.test(rawAmountStr)) {
+      errors.push(
+        `Row ${rowNum}: Invalid amount "${row[amountIdx]}". Must be a positive numeric value with at most 2 decimal places.`
+      );
+      continue;
+    }
+    const numAmount = parseFloat(rawAmountStr);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      errors.push(`Row ${rowNum}: Amount must be greater than zero.`);
+      continue;
+    }
+    if (numAmount * 100 > Number.MAX_SAFE_INTEGER) {
+      errors.push(`Row ${rowNum}: Amount exceeds safe value limit.`);
       continue;
     }
     const amountPaise = rupeesToPaise(numAmount);
 
-    // Category
+    // Validate Category
     const category = row[categoryIdx]?.trim();
-    if (!category) {
+    if (!category || category.length === 0) {
       errors.push(`Row ${rowNum}: Category cannot be empty.`);
       continue;
     }
 
-    // Date
+    // Validate Date with calendar verification
     const rawDate = row[dateIdx];
-    const normalizedDate = normalizeDate(rawDate);
+    const normalizedDate = normalizeAndValidateDate(rawDate);
     if (!normalizedDate) {
-      errors.push(`Row ${rowNum}: Invalid date format "${rawDate}".`);
+      errors.push(
+        `Row ${rowNum}: Malformed or impossible calendar date "${rawDate}". Expected valid YYYY-MM-DD or DD-MM-YYYY.`
+      );
       continue;
     }
 
-    // Description
+    // Process Description
     let description = descIdx !== -1 && row[descIdx] ? row[descIdx].trim() : '';
-    // Strip leading single quote from formula injection prevention if present
+    // Strip leading single quote from formula injection defense if present
     if (description.startsWith("'")) {
-      description = description.substring(1);
+      description = description.substring(1).trimStart();
     }
 
-    // ID
+    // Process ID and check file-internal duplicate IDs
     const explicitId = idIdx !== -1 && row[idIdx]?.trim() ? row[idIdx].trim() : null;
+    if (explicitId) {
+      if (fileInternalIds.has(explicitId)) {
+        errors.push(`Row ${rowNum}: Duplicate transaction ID "${explicitId}" within the file.`);
+        continue;
+      }
+      fileInternalIds.add(explicitId);
+    }
 
-    // Check duplicate
-    const key = `${normalizedDate}_${amountPaise}_${category.toLowerCase()}_${type}`;
-    if (skipDuplicates && (existingKeys.has(key) || (explicitId && existingTransactions.some((t) => t.id === explicitId)))) {
+    // Check duplicate key
+    const uniqueKey = `${normalizedDate}_${amountPaise}_${category.toLowerCase()}_${type}`;
+    if (fileInternalKeys.has(uniqueKey)) {
+      if (skipDuplicates) {
+        skippedDuplicatesCount++;
+        continue;
+      }
+    }
+    fileInternalKeys.add(uniqueKey);
+
+    // Check against existing database
+    if (
+      skipDuplicates &&
+      (existingKeys.has(uniqueKey) || (explicitId && existingIds.has(explicitId)))
+    ) {
       skippedDuplicatesCount++;
       continue;
     }
 
-    existingKeys.add(key);
-
     const now = new Date().toISOString();
     const tx: Transaction = {
-      id: explicitId || `tx_csv_${Date.now()}_${i}`,
+      id: explicitId || `tx_csv_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`,
       type,
       amount: amountPaise,
       category,
