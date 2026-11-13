@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
+import { CategoryIcon, CategoryIconGlyph } from '../ui/CategoryIcon';
 import { Category, TransactionType } from '../../types';
 import { categoryFormSchema } from '../../services/validation/schemas';
 
@@ -11,12 +12,13 @@ interface CategoryModalProps {
   onClose: () => void;
   onSubmit: (data: Omit<Category, 'id' | 'createdAt' | 'isCustom'>) => Promise<any>;
   initialData?: Category | null;
+  defaultType?: TransactionType;
 }
 
 const PRESET_COLORS = [
-  '#06B6D4', '#3B82F6', '#8B5CF6', '#EC4899',
-  '#EF4444', '#F97316', '#F59E0B', '#10B981',
-  '#14B8A6', '#6366F1', '#A855F7', '#64748B',
+  '#06B6D4', '#0EA5E9', '#3B82F6', '#6366F1',
+  '#8B5CF6', '#EC4899', '#F43F5E', '#F97316',
+  '#F59E0B', '#10B981', '#14B8A6', '#64748B',
 ];
 
 const PRESET_ICONS = [
@@ -30,15 +32,17 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
   onClose,
   onSubmit,
   initialData,
+  defaultType = 'expense',
 }) => {
   const [name, setName] = useState('');
-  const [type, setType] = useState<TransactionType>('expense');
+  const [type, setType] = useState<TransactionType>(defaultType);
   const [color, setColor] = useState('#06B6D4');
   const [icon, setIcon] = useState('Tag');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    if (!isOpen) return;
     if (initialData) {
       setName(initialData.name);
       setType(initialData.type);
@@ -46,12 +50,12 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       setIcon(initialData.icon);
     } else {
       setName('');
-      setType('expense');
+      setType(defaultType);
       setColor('#06B6D4');
       setIcon('Tag');
     }
     setErrors({});
-  }, [initialData, isOpen]);
+  }, [initialData, defaultType, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,20 +98,38 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={initialData ? 'Edit Category' : 'Create Custom Category'}
-      description="Add a personalized spending or income category to organize your transactions."
+      description="Personalize your expense or income classification with a badge color and icon."
       maxWidth="md"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {errors.form && (
           <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
             {errors.form}
           </div>
         )}
 
+        {/* Live Preview */}
+        <div className="p-3 rounded-xl bg-[#090E18] border border-white/[0.06] flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CategoryIcon name={icon} color={color} size="md" />
+            <div>
+              <p className="text-sm font-semibold text-white">
+                {name.trim() || 'Category Preview'}
+              </p>
+              <p className="text-[11px] text-slate-400 capitalize">{type} category</p>
+            </div>
+          </div>
+          <span
+            className="w-3 h-3 rounded-full border border-white/20"
+            style={{ backgroundColor: color }}
+          />
+        </div>
+
         <Input
           label="Category Name"
           type="text"
-          placeholder="e.g. Gym, Freelance, Subscriptions"
+          maxLength={40}
+          placeholder="e.g. Gym, Rent, Subscriptions"
           value={name}
           onChange={(e) => setName(e.target.value)}
           error={errors.name}
@@ -121,23 +143,27 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
           error={errors.type}
           required
         >
-          <option value="expense" className="bg-slate-900 text-white">Expense Category</option>
-          <option value="income" className="bg-slate-900 text-white">Income Category</option>
+          <option value="expense" className="bg-[#0D131F] text-white">Expense Category</option>
+          <option value="income" className="bg-[#0D131F] text-white">Income Category</option>
         </Select>
 
         {/* Color Palette Selector */}
         <div>
-          <label className="block text-xs font-medium text-slate-300 mb-2">
-            Badge & Orbit Color
-          </label>
-          <div className="flex flex-wrap gap-2.5">
+          <span className="block text-xs font-medium text-slate-300 mb-2">
+            Accent Color
+          </span>
+          <div className="flex flex-wrap gap-2">
             {PRESET_COLORS.map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => setColor(c)}
+                aria-label={`Select color ${c}`}
+                aria-pressed={color === c}
                 className={`w-7 h-7 rounded-full transition-transform ${
-                  color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900 scale-110' : 'hover:scale-105'
+                  color === c
+                    ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0D131F] scale-110'
+                    : 'hover:scale-105 opacity-85 hover:opacity-100'
                 }`}
                 style={{ backgroundColor: c }}
               />
@@ -146,30 +172,36 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
           {errors.color && <p className="mt-1 text-xs text-rose-400">{errors.color}</p>}
         </div>
 
-        {/* Icon Selector */}
+        {/* Visual Icon Picker Grid */}
         <div>
-          <label className="block text-xs font-medium text-slate-300 mb-2">
+          <span className="block text-xs font-medium text-slate-300 mb-2">
             Category Icon
-          </label>
-          <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto p-1 bg-slate-900/60 rounded-xl border border-slate-800">
-            {PRESET_ICONS.map((ic) => (
-              <button
-                key={ic}
-                type="button"
-                onClick={() => setIcon(ic)}
-                className={`px-2.5 py-1 text-xs rounded-lg transition ${
-                  icon === ic
-                    ? 'bg-cyan-500 text-white font-medium shadow-md shadow-cyan-500/20'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                {ic}
-              </button>
-            ))}
+          </span>
+          <div className="grid grid-cols-8 gap-1.5 p-2 bg-[#090E18] rounded-xl border border-white/[0.06]">
+            {PRESET_ICONS.map((ic) => {
+              const selected = icon === ic;
+              return (
+                <button
+                  key={ic}
+                  type="button"
+                  onClick={() => setIcon(ic)}
+                  title={ic}
+                  aria-label={`Select ${ic} icon`}
+                  aria-pressed={selected}
+                  className={`h-9 rounded-lg flex items-center justify-center transition border ${
+                    selected
+                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/80 border-transparent'
+                  }`}
+                >
+                  <CategoryIconGlyph name={ic} className="w-4 h-4" />
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/5">
+        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/[0.06]">
           <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>

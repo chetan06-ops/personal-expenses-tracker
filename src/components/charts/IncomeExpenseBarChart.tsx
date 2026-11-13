@@ -9,22 +9,35 @@ import {
   Legend,
   CartesianGrid,
 } from 'recharts';
+import { BarChart3 } from 'lucide-react';
 import { MonthlyTrendItem } from '../../types';
 import { formatINR } from '../../utils/currency';
+import { EmptyState } from '../ui/EmptyState';
 
 interface IncomeExpenseBarChartProps {
   data: MonthlyTrendItem[];
 }
 
+function formatAxisINR(rupees: number): string {
+  if (Math.abs(rupees) >= 100000) {
+    return `₹${(rupees / 100000).toFixed(1)}L`;
+  }
+  if (Math.abs(rupees) >= 1000) {
+    return `₹${(rupees / 1000).toFixed(0)}k`;
+  }
+  return `₹${rupees}`;
+}
+
 export const IncomeExpenseBarChart: React.FC<IncomeExpenseBarChartProps> = ({ data }) => {
   if (data.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-center p-4">
-        <p className="text-sm font-medium text-slate-300">No Monthly Trends Yet</p>
-        <p className="text-xs text-slate-500 mt-1 max-w-xs">
-          Add transactions across different months to compare cash inflows vs outflows.
-        </p>
-      </div>
+      <EmptyState
+        compact
+        icon={<BarChart3 className="w-5 h-5" />}
+        title="No Monthly Trends Yet"
+        description="Add transactions across months to compare cash inflows vs. outflows."
+        className="h-64"
+      />
     );
   }
 
@@ -43,25 +56,26 @@ export const IncomeExpenseBarChart: React.FC<IncomeExpenseBarChartProps> = ({ da
       const net = inc - exp;
 
       return (
-        <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700 px-3.5 py-2.5 rounded-xl shadow-xl min-w-[150px]">
-          <p className="text-xs font-semibold text-slate-300 mb-2 border-b border-white/10 pb-1">
+        <div className="bg-[#0D131F]/95 backdrop-blur-md border border-slate-700/80 px-3.5 py-2.5 rounded-xl shadow-elevated min-w-[175px]">
+          <p className="text-xs font-semibold text-slate-200 mb-2 border-b border-white/[0.06] pb-1.5">
             {label}
           </p>
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span className="text-emerald-400 font-medium">Income:</span>
-            <span className="font-mono text-emerald-300">{formatINR(inc)}</span>
+          <div className="flex items-center justify-between gap-4 text-xs mb-1">
+            <span className="text-emerald-400 font-medium">Income</span>
+            <span className="font-mono text-emerald-300 tabular-nums">{formatINR(inc)}</span>
           </div>
-          <div className="flex items-center justify-between text-xs mb-1.5">
-            <span className="text-rose-400 font-medium">Expenses:</span>
-            <span className="font-mono text-rose-300">{formatINR(exp)}</span>
+          <div className="flex items-center justify-between gap-4 text-xs mb-1.5">
+            <span className="text-rose-400 font-medium">Expenses</span>
+            <span className="font-mono text-rose-300 tabular-nums">{formatINR(exp)}</span>
           </div>
-          <div className="flex items-center justify-between text-xs pt-1 border-t border-white/5">
-            <span className="text-slate-400">Net:</span>
+          <div className="flex items-center justify-between gap-4 text-xs pt-1.5 border-t border-white/[0.06]">
+            <span className="text-slate-400 font-medium">Net Flow</span>
             <span
-              className={`font-mono font-bold ${
+              className={`font-mono font-bold tabular-nums ${
                 net >= 0 ? 'text-cyan-300' : 'text-rose-400'
               }`}
             >
+              {net >= 0 ? '+' : ''}
               {formatINR(net)}
             </span>
           </div>
@@ -74,30 +88,37 @@ export const IncomeExpenseBarChart: React.FC<IncomeExpenseBarChartProps> = ({ da
   return (
     <div className="w-full h-64">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={chartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+        <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.08)" vertical={false} />
           <XAxis
             dataKey="month"
             stroke="#64748B"
             fontSize={11}
             tickLine={false}
+            axisLine={{ stroke: 'rgba(148, 163, 184, 0.12)' }}
           />
           <YAxis
             stroke="#64748B"
             fontSize={11}
             tickLine={false}
-            tickFormatter={(val) => `₹${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`}
+            axisLine={false}
+            tickFormatter={formatAxisINR}
           />
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip
+            content={<CustomTooltip />}
+            cursor={{ fill: 'rgba(148, 163, 184, 0.06)' }}
+          />
           <Legend
             verticalAlign="bottom"
-            height={30}
+            height={28}
+            iconType="circle"
+            iconSize={8}
             formatter={(value) => (
-              <span className="text-xs text-slate-300 font-medium">{value}</span>
+              <span className="text-xs text-slate-300 font-medium ml-1">{value}</span>
             )}
           />
-          <Bar dataKey="Income" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={32} />
-          <Bar dataKey="Expenses" fill="#F43F5E" radius={[4, 4, 0, 0]} maxBarSize={32} />
+          <Bar dataKey="Income" fill="#10B981" radius={[5, 5, 0, 0]} maxBarSize={36} />
+          <Bar dataKey="Expenses" fill="#F43F5E" radius={[5, 5, 0, 0]} maxBarSize={36} />
         </BarChart>
       </ResponsiveContainer>
     </div>

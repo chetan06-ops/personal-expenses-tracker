@@ -3,19 +3,16 @@ import { paiseToRupees } from '../../utils/currency';
 
 /**
  * Sanitizes a string cell to protect against CSV / Excel Formula Injection (CSV Injection).
- * Spreadsheet software executes cells starting with '=', '+', '-', '@', '\t', '\r',
- * or leading spaces followed by these characters.
+ * Cells starting with '=', '+', '-', '@', '\t', or '\r' can be executed as formulas by spreadsheet software.
  */
-export function sanitizeCsvCell(value: string | number | undefined | null): string {
+function sanitizeCsvCell(value: string | number | undefined | null): string {
   if (value === null || value === undefined) return '""';
   let str = String(value);
 
-  // Check trimmed character for formula triggers
-  const trimmed = str.trimStart();
+  // Check for formula injection triggers
   const formulaTriggers = ['=', '+', '-', '@', '\t', '\r'];
-
-  if (trimmed.length > 0 && formulaTriggers.includes(trimmed.charAt(0))) {
-    // Neutralize formula trigger by prepending single quote
+  if (str.length > 0 && formulaTriggers.includes(str.charAt(0))) {
+    // Prepend single quote to neutralize formula execution in Excel/Calc
     str = `'${str}`;
   }
 
@@ -25,7 +22,7 @@ export function sanitizeCsvCell(value: string | number | undefined | null): stri
 }
 
 /**
- * Converts transactions into a CSV formatted string.
+ * Converts transactions into a CSV formatted string
  */
 export function generateTransactionsCsv(transactions: Transaction[]): string {
   const headers = [
@@ -57,7 +54,7 @@ export function generateTransactionsCsv(transactions: Transaction[]): string {
 }
 
 /**
- * Triggers a browser download of the CSV file.
+ * Triggers a browser download of the CSV file
  */
 export function downloadCsvFile(csvContent: string, fileName = 'personal-expenses-export.csv'): void {
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

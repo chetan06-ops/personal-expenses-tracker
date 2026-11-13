@@ -1,29 +1,6 @@
 import { FilterPeriod } from '../types';
 
 /**
- * Verifies whether a date string is a real calendar date (checks day, month, leap year).
- * Rejects impossible dates like 2026-02-30 or 2026-04-31.
- */
-export function isValidCalendarDate(dateString: string): boolean {
-  if (!dateString || typeof dateString !== 'string') return false;
-  const match = dateString.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return false;
-
-  const year = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10);
-  const day = parseInt(match[3], 10);
-
-  if (year < 1970 || year > 2099) return false;
-  if (month < 1 || month > 12) return false;
-
-  // Days in month checking leap years
-  const daysInMonth = new Date(year, month, 0).getDate();
-  if (day < 1 || day > daysInMonth) return false;
-
-  return true;
-}
-
-/**
  * Returns today's date in YYYY-MM-DD format (local time)
  */
 export function getTodayDateString(): string {
@@ -39,8 +16,7 @@ export function getTodayDateString(): string {
  */
 export function formatIndianDate(dateString: string): string {
   if (!dateString) return '';
-  const clean = dateString.split('T')[0];
-  const [year, month, day] = clean.split('-');
+  const [year, month, day] = dateString.split('T')[0].split('-');
   if (!year || !month || !day) return dateString;
   return `${day}-${month}-${year}`;
 }
@@ -50,8 +26,7 @@ export function formatIndianDate(dateString: string): string {
  */
 export function formatDisplayDate(dateString: string): string {
   if (!dateString) return '';
-  const clean = dateString.includes('T') ? dateString : `${dateString}T00:00:00`;
-  const date = new Date(clean);
+  const date = new Date(dateString.includes('T') ? dateString : `${dateString}T00:00:00`);
   if (isNaN(date.getTime())) return dateString;
   return new Intl.DateTimeFormat('en-IN', {
     day: '2-digit',
@@ -116,8 +91,8 @@ export function getDateRangeForPeriod(
 
     case 'custom': {
       return {
-        startDate: customStart && isValidCalendarDate(customStart) ? customStart : '1970-01-01',
-        endDate: customEnd && isValidCalendarDate(customEnd) ? customEnd : '2099-12-31',
+        startDate: customStart || '1970-01-01',
+        endDate: customEnd || '2099-12-31',
       };
     }
 
@@ -143,8 +118,11 @@ export function getMonthKey(date: Date = new Date()): string {
  * Formats YYYY-MM into a friendly label like "October 2026"
  */
 export function formatMonthLabel(monthKey: string): string {
-  if (!monthKey || !monthKey.includes('-')) return monthKey;
+  if (!monthKey || !/^\d{4}-\d{2}$/.test(monthKey)) {
+    return monthKey || 'Invalid Month';
+  }
   const [year, month] = monthKey.split('-');
   const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+  if (isNaN(date.getTime())) return monthKey;
   return new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric' }).format(date);
 }

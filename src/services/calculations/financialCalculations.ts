@@ -1,12 +1,14 @@
 import {
   Transaction,
   Category,
+  Budget,
   FinancialSummary,
   CategoryBreakdownItem,
   MonthlyTrendItem,
   DailySpendingItem,
 } from '../../types';
 import { getMonthKey, formatMonthLabel } from '../../utils/date';
+import { formatINR } from '../../utils/currency';
 
 /**
  * Calculates complete financial metrics from an array of transactions.
@@ -80,9 +82,7 @@ export function calculateFinancialSummary(
 
   const categoryBreakdown: CategoryBreakdownItem[] = Array.from(categoryExpensesMap.entries())
     .map(([catName, stats], index) => {
-      const catObj =
-        categoriesMap?.get(`expense:${catName.toLowerCase()}`) ||
-        categoriesMap?.get(catName);
+      const catObj = categoriesMap?.get(catName);
       const color = catObj?.color || defaultColors[index % defaultColors.length];
       const percentage = totalExpenses > 0 ? (stats.amount / totalExpenses) * 100 : 0;
 
@@ -178,4 +178,216 @@ export function calculateBudgetStatus(
     isNearLimit,
     status,
   };
+}
+
+export interface MonthComparisonMetrics {
+  currentMonthKey: string;
+  previousMonthKey: string;
+  currentExpenses: number;
+  previousExpenses: number;
+  currentIncome: number;
+  previousIncome: number;
+  expenseDeltaPct: number | null;
+  incomeDeltaPct: number | null;
+}
+
+/**
+ * Compares current month income and expenses against the immediately preceding month.
+ */
+export function calculateMonthComparison(
+  transactions: Transaction[],
+  referenceDate: Date = new Date()
+): MonthComparisonMetrics {
+  const currentMonthKey = getMonthKey(referenceDate);
+  const prevDate = new Date(referenceDate.getFullYear(), referenceDate.getMonth() - 1, 1);
+  const previousMonthKey = getMonthKey(prevDate);
+
+  let currentExpenses = 0;
+  let previousExpenses = 0;
+  let currentIncome = 0;
+  let previousIncome = 0;
+
+  for (const tx of transactions) {
+    const monthKey = tx.date.substring(0, 7);
+    if (monthKey === currentMonthKey) {
+      if (tx.type === 'expense') currentExpenses += tx.amount;
+      else currentIncome += tx.amount;
+    } else if (monthKey === previousMonthKey) {
+      if (tx.type === 'expense') previousExpenses += tx.amount;
+      else previousIncome += tx.amount;
+    }
+  }
+
+  const expenseDeltaPct =
+    previousExpenses > 0
+      ? Math.round(((currentExpenses - previousExpenses) / previousExpenses) * 100)
+      : null;
+
+  const incomeDeltaPct =
+    previousIncome > 0
+      ? Math.round(((currentIncome - previousIncome) / previousIncome) * 100)
+      : null;
+
+  return {
+    currentMonthKey,
+    previousMonthKey,
+    currentExpenses,
+    previousExpenses,
+    currentIncome,
+    previousIncome,
+    expenseDeltaPct,
+    incomeDeltaPct,
+  };
+}
+
+/**
+ * Computes remaining days in the reference month and safe daily spend allowance in integer paise.
+ */
+export function calculateSafeDailyAllowance(
+  budgetLimitPaise: number,
+  spentPaise: number,
+  referenceDate: Date = new Date()
+): { daysRemaining: number; safeDailyPaise: number } {
+  const daysInMonth = new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth() + 1,
+    0
+  ).getDate();
+  const daysRemaining = Math.max(1, daysInMonth - referenceDate.getDate() + 1);
+  const remainingPaise = Math.max(0, budgetLimitPaise - spentPaise);
+  return {
+    daysRemaining,
+    safeDailyPaise: Math.floor(remainingPaise / daysRemaining),
+  };
+}
+
+export interface FinancialInsight {
+  id: string;
+  tone: 'positive' | 'warning' | 'danger' | 'neutral' | 'info';
+  title: string;
+  detail: string;
+  metric?: string;
+}
+
+/**
+ * Generates deterministic, real-data insights from actual transactions and budgets.
+ */
+export function calculateFinancialInsights(params: {
+  filteredTransactions: Transaction[];
+  allTransactions: Transaction[];
+  budgets: Budget[];
+  overallBudgetLimitPaise: number;
+  categoriesMap?: Map<string, Category>;
+  referenceDate?: Date;
+}): FinancialInsight[] {
+  const {
+    filteredTransactions,
+    allTransactions,
+    budgets,
+    overallBudgetLimitPaise,
+    categoriesMap,
+    referenceDate = new Date(),
+  } = params;
+
+  const insights: FinancialInsight[] = [];
+  const summary = calculateFinancialSummary(filteredTransactions, categoriesMap);
+  const monthComparison = calculateMonthComparison(allTransactions, referenceDate);
+
+  // 1. Top expense category concentration
+  if (summary.categoryBreakdown.length > 0 && summary.totalExpenses > 0) {
+    const top = summary.categoryBreakdown[0];
+    insights.push({
+      id: 'top-category',
+      tone: top.percentage >= 50 ? 'warning' : 'info',
+      title: `Top Spend: ${top.category}`,
+      detail: `${top.category} accounts for ${top.percentage}% of period outflows across ${top.count} transaction${top.count === 1 ? '' : 's'}.`,
+      metric: formatINR(top.amount),
+    });
+  }
+
+  // 2. Average expense per transaction & active spending days
+  const expenseTxs = filteredTransactions.filter((t) => t.type === 'expense');
+  if (expenseTxs.length > 0) {
+    const activeDays = new Set(expenseTxs.map((t) => t.date)).size;
+    const avgPerTx = Math.round(summary.totalExpenses / expenseTxs.length);
+    const avgPerActiveDay = Math.round(summary.totalExpenses / Math.max(1, activeDays));
+    insights.push({
+      id: 'spending-pace',
+      tone: 'neutral',
+      title: 'Spending Velocity',
+      detail: `Averaging ${formatINR(avgPerTx)} per expense across ${activeDays} active day${activeDays === 1 ? '' : 's'}.`,
+      metric: `${formatINR(avgPerActiveDay)}/day`,
+    });
+  }
+
+  // 3. Month-over-month spending comparison
+  if (monthComparison.expenseDeltaPct !== null) {
+    const delta = monthComparison.expenseDeltaPct;
+    const absDelta = Math.abs(delta);
+    const label = formatMonthLabel(monthComparison.previousMonthKey);
+    insights.push({
+      id: 'mom-comparison',
+      tone: delta > 10 ? 'warning' : delta < 0 ? 'positive' : 'neutral',
+      title: 'Month-over-Month Pace',
+      detail:
+        delta === 0
+          ? `This month's spending matches ${label} (${formatINR(monthComparison.previousExpenses)}).`
+          : delta > 0
+          ? `Current month spending is ${absDelta}% higher than ${label} (${formatINR(monthComparison.previousExpenses)}).`
+          : `Current month spending is ${absDelta}% lower than ${label} (${formatINR(monthComparison.previousExpenses)}).`,
+      metric: `${delta > 0 ? '+' : ''}${delta}%`,
+    });
+  }
+
+  // 4. Budget health & safe daily spend for current month
+  const currentMonthExpByCat = new Map<string, number>();
+  let currentMonthTotalExp = 0;
+  for (const tx of allTransactions) {
+    if (tx.type === 'expense' && tx.date.startsWith(monthComparison.currentMonthKey)) {
+      currentMonthTotalExp += tx.amount;
+      currentMonthExpByCat.set(
+        tx.category,
+        (currentMonthExpByCat.get(tx.category) || 0) + tx.amount
+      );
+    }
+  }
+
+  const categoryBudgets = budgets.filter((b) => b.category !== 'TOTAL');
+  if (categoryBudgets.length > 0) {
+    let atRisk = 0;
+    let exceeded = 0;
+    for (const b of categoryBudgets) {
+      const status = calculateBudgetStatus(b.limit, currentMonthExpByCat.get(b.category) || 0);
+      if (status.isOverBudget) exceeded++;
+      else if (status.isNearLimit) atRisk++;
+    }
+
+    insights.push({
+      id: 'budget-compliance',
+      tone: exceeded > 0 ? 'danger' : atRisk > 0 ? 'warning' : 'positive',
+      title: 'Category Caps Health',
+      detail:
+        exceeded > 0
+          ? `${exceeded} category budget${exceeded === 1 ? '' : 's'} exceeded and ${atRisk} approaching limit.`
+          : atRisk > 0
+          ? `${atRisk} category budget${atRisk === 1 ? '' : 's'} above 80% threshold.`
+          : `All ${categoryBudgets.length} configured category budgets are within safe limits.`,
+      metric: `${categoryBudgets.length - exceeded - atRisk}/${categoryBudgets.length} OK`,
+    });
+  } else if (overallBudgetLimitPaise > 0) {
+    const { daysRemaining, safeDailyPaise } = calculateSafeDailyAllowance(
+      overallBudgetLimitPaise,
+      currentMonthTotalExp,
+      referenceDate
+    );
+    insights.push({
+      id: 'daily-allowance',
+      tone: currentMonthTotalExp > overallBudgetLimitPaise ? 'danger' : 'positive',
+      title: 'Safe Daily Runway',
+      detail: `Based on your monthly cap with ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining this month.`,
+      metric: `${formatINR(safeDailyPaise)}/day`,
+    });
+  }
+
+  return insights;
 }

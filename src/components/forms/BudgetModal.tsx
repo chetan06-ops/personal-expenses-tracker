@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Budget } from '../../types';
 import { useCategories } from '../../hooks/useCategories';
-import { rupeesToPaise, paiseToRupees } from '../../utils/currency';
+import { useTransactions } from '../../hooks/useTransactions';
+import { rupeesToPaise, paiseToRupees, formatINR } from '../../utils/currency';
 import { getMonthKey } from '../../utils/date';
 import { budgetFormSchema } from '../../services/validation/schemas';
 
@@ -15,6 +16,7 @@ interface BudgetModalProps {
   onSubmit: (data: Omit<Budget, 'id' | 'createdAt' | 'updatedAt'>) => Promise<any>;
   initialData?: Budget | null;
   defaultMonth?: string;
+  initialCategory?: string;
 }
 
 export const BudgetModal: React.FC<BudgetModalProps> = ({
@@ -23,8 +25,10 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
   onSubmit,
   initialData,
   defaultMonth = getMonthKey(),
+  initialCategory,
 }) => {
   const { expenseCategories } = useCategories();
+  const { allTransactions } = useTransactions();
 
   const [category, setCategory] = useState<string>('TOTAL');
   const [limit, setLimit] = useState<string>('');
@@ -33,17 +37,28 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    if (!isOpen) return;
     if (initialData) {
       setCategory(initialData.category);
       setLimit(paiseToRupees(initialData.limit).toString());
       setMonth(initialData.month);
     } else {
-      setCategory('TOTAL');
+      setCategory(initialCategory || 'TOTAL');
       setLimit('');
       setMonth(defaultMonth);
     }
     setErrors({});
-  }, [initialData, defaultMonth, isOpen]);
+  }, [initialData, defaultMonth, initialCategory, isOpen]);
+
+  // Real spent amount for the selected category and month so user has immediate context
+  const currentSpentPaise = useMemo(() => {
+    return allTransactions
+      .filter((tx) => {
+        if (tx.type !== 'expense' || !tx.date.startsWith(month)) return false;
+        return category === 'TOTAL' ? true : tx.category === category;
+      })
+      .reduce((sum, tx) => sum + tx.amount, 0);
+  }, [allTransactions, category, month]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,10 +103,10 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={initialData ? 'Edit Budget Target' : 'Create Budget Limit'}
-      description="Set a spending cap for a specific category or your entire monthly expenses."
+      description="Set a monthly spending cap for a specific category or your overall monthly expenses."
       maxWidth="md"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {errors.form && (
           <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
             {errors.form}
@@ -105,25 +120,37 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
           error={errors.category}
           required
         >
-          <option value="TOTAL" className="bg-slate-900 text-cyan-300 font-semibold">
-            ★ Total Overall Monthly Spending
+          <option value="TOTAL" className="bg-[#0D131F] text-cyan-300 font-semibold">
+            ★ Overall Monthly Spending Limit
           </option>
           {expenseCategories.map((cat) => (
-            <option key={cat.id} value={cat.name} className="bg-slate-900 text-white">
+            <option key={cat.id} value={cat.name} className="bg-[#0D131F] text-white">
               {cat.name}
             </option>
           ))}
         </Select>
 
+        {/* Live Context Banner */}
+        <div className="p-3 rounded-xl bg-[#090E18] border border-white/[0.06] flex items-center justify-between text-xs">
+          <span className="text-slate-400">
+            Actual spent ({category === 'TOTAL' ? 'All Categories' : category}) in {month}
+          </span>
+          <span className="font-mono font-bold text-slate-200 tabular-nums">
+            {formatINR(currentSpentPaise)}
+          </span>
+        </div>
+
         <Input
           label="Budget Spending Limit (INR)"
           type="number"
           step="0.01"
+          min="1"
           placeholder="e.g. 5000"
           value={limit}
           onChange={(e) => setLimit(e.target.value)}
           error={errors.limit}
           leftAddon={<span className="font-mono text-cyan-400 font-semibold">₹</span>}
+          className="font-mono tabular-nums"
           required
         />
 
@@ -136,7 +163,7 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
           required
         />
 
-        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/5">
+        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/[0.06]">
           <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>

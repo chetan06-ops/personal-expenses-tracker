@@ -9,7 +9,7 @@ import { Orbit2DFallback } from '../fallback/Orbit2DFallback';
 import { CategoryBreakdownItem } from '../../types';
 import { Eye, Layers } from 'lucide-react';
 
-export interface FinancialOrbitSceneProps {
+interface FinancialOrbitSceneProps {
   netBalance: number;
   totalExpenses: number;
   categoryBreakdown: CategoryBreakdownItem[];
@@ -87,12 +87,11 @@ export const FinancialOrbitScene: React.FC<FinancialOrbitSceneProps> = ({
     />
   );
 
-  // If WebGL is unavailable, user disabled 3D, or prefers reduced motion, render 2D
-  if (!hasWebGL || !enable3D || forced2D || reducedMotion) {
+  if (!hasWebGL || !enable3D || forced2D) {
     return (
       <div className="relative">
         {fallbackView}
-        {hasWebGL && enable3D && !reducedMotion && (
+        {hasWebGL && enable3D && (
           <button
             onClick={() => setForced2D(false)}
             className="absolute top-2 right-2 flex items-center gap-1 text-[11px] bg-slate-800/80 hover:bg-slate-700 text-cyan-300 px-2 py-1 rounded-md border border-slate-700 transition"
@@ -117,13 +116,6 @@ export const FinancialOrbitScene: React.FC<FinancialOrbitSceneProps> = ({
             dpr={[1, 1.5]}
             frameloop={reducedMotion ? 'demand' : 'always'}
             gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
-            onCreated={({ gl }) => {
-              gl.domElement.addEventListener('webglcontextlost', (e) => {
-                e.preventDefault();
-                console.warn('WebGL context lost, falling back to 2D');
-                setForced2D(true);
-              });
-            }}
           >
             {/* Ambient and Key Lighting */}
             <ambientLight intensity={0.5} />
@@ -165,13 +157,15 @@ export const FinancialOrbitScene: React.FC<FinancialOrbitSceneProps> = ({
         </button>
       </div>
 
-      {/* Bottom Status Hint */}
-      <div className="absolute bottom-2 left-3 pointer-events-none text-[10px] text-slate-500 font-mono flex items-center gap-2">
+      {/* Bottom Hint */}
+      <div className="absolute bottom-2.5 left-3 pointer-events-none text-[10px] text-slate-400 font-mono flex items-center gap-2 bg-slate-950/60 px-2.5 py-1 rounded-full border border-white/[0.06]">
         <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-        <span>Interactive Financial Orbit • Drag to rotate</span>
+        <span>
+          {categoryBreakdown.length === 0
+            ? 'Central Core Active • Add expenses to map category nodes'
+            : 'Interactive Financial Orbit • Drag to rotate'}
+        </span>
       </div>
     </div>
   );
 };
-
-export default FinancialOrbitScene;

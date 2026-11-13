@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '../ui/Button';
 import { NavTab } from './Sidebar';
-import { Plus, GraduationCap, Menu, ShieldCheck } from 'lucide-react';
+import { Plus, GraduationCap, Menu } from 'lucide-react';
 
 interface HeaderProps {
   currentTab: NavTab;
@@ -18,70 +18,68 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const titles: Record<NavTab, { title: string; subtitle: string }> = {
     dashboard: {
-      title: 'Financial Dashboard',
-      subtitle: 'Real-time overview of your cash flows, savings rate, and 3D Financial Orbit.',
+      title: 'Financial Overview',
+      subtitle: 'Cash flow summary, budget pacing, insights, and interactive 3D orbit.',
     },
     transactions: {
-      title: 'Transaction Management',
-      subtitle: 'Record, review, edit, filter, and search your income and expense logs.',
+      title: 'Transactions Ledger',
+      subtitle: 'Search, filter, sort, and manage your income and expense entries.',
     },
     budgets: {
       title: 'Budget Intelligence',
-      subtitle: 'Set monthly limits, track category thresholds, and prevent overspending.',
+      subtitle: 'Configure monthly spending limits and monitor threshold alerts.',
     },
     reports: {
       title: 'Reports & Analytics',
-      subtitle: 'Deep dive into spending distributions, monthly trends, and cash flow comparisons.',
+      subtitle: 'Daily spending velocity, category share rankings, and monthly cash flows.',
     },
     categories: {
       title: 'Category Manager',
-      subtitle: 'Organize transaction classification with default and custom categories.',
+      subtitle: 'Customize expense and income categories with icons and color tags.',
     },
     settings: {
-      title: 'Settings & Data Management',
-      subtitle: 'Export CSV, backup/restore JSON, load academic test data, and configure preferences.',
+      title: 'Settings & Data',
+      subtitle: 'Configure 3D preferences, CSV import/export, and local JSON backups.',
     },
   };
 
-  const current = titles[currentTab] || { title: 'Personal Expenses Tracker', subtitle: '' };
+  const current = titles[currentTab] || { title: 'Expenses Tracker', subtitle: '' };
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between px-5 sm:px-8 py-4 bg-[#0B0F19]/80 backdrop-blur-xl border-b border-slate-800/80">
-      <div className="flex items-center gap-3">
-        {/* Mobile Hamburger Button */}
+    <header className="sticky top-0 z-30 flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 py-3.5 bg-[#070B12]/85 backdrop-blur-md border-b border-white/[0.06]">
+      <div className="flex items-center gap-3 min-w-0">
         <button
+          type="button"
           onClick={onToggleMobileMenu}
-          className="lg:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-700 transition"
+          className="lg:hidden p-2 rounded-xl text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-700/70 transition shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
           aria-label="Toggle Navigation Menu"
         >
           <Menu className="w-5 h-5" />
         </button>
 
-        <div>
-          <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
-            <span>{current.title}</span>
+        <div className="min-w-0">
+          <h2 className="text-base sm:text-lg font-bold tracking-tight text-white truncate">
+            {current.title}
           </h2>
-          <p className="hidden sm:block text-xs text-slate-400 mt-0.5">
+          <p className="hidden sm:block text-xs text-slate-400 mt-0.5 truncate">
             {current.subtitle}
           </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-3">
-        {/* Academic Project Info Badge Button */}
+      <div className="flex items-center gap-2 shrink-0">
         <Button
           variant="glass"
           size="sm"
           className="text-xs"
-          leftIcon={<GraduationCap className="w-4 h-4 text-cyan-400" />}
+          leftIcon={<GraduationCap className="w-3.5 h-3.5 text-cyan-400" />}
           onClick={onOpenAcademicModal}
           title="View University Project Information"
         >
-          <span className="hidden md:inline">BCA-308 Details</span>
+          <span className="hidden md:inline">BCA-308 Info</span>
           <span className="md:hidden">Info</span>
         </Button>
 
-        {/* Quick Add Button */}
         <Button
           variant="primary"
           size="sm"

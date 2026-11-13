@@ -1,284 +1,193 @@
 import React, { useState, useMemo } from 'react';
-import { Card, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Card, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { PeriodFilterBar } from '../../components/ui/PeriodFilterBar';
+import { CategoryIcon } from '../../components/ui/CategoryIcon';
 import { CategoryPieChart } from '../../components/charts/CategoryPieChart';
 import { IncomeExpenseBarChart } from '../../components/charts/IncomeExpenseBarChart';
 import { TrendAreaChart } from '../../components/charts/TrendAreaChart';
 import { FilterPeriod } from '../../types';
 import { useTransactions } from '../../hooks/useTransactions';
 import { useCategories } from '../../hooks/useCategories';
+import { showToast } from '../../hooks/useToast';
 import {
   calculateFinancialSummary,
   calculateDailySpending,
 } from '../../services/calculations/financialCalculations';
 import { formatINR } from '../../utils/currency';
-import { getDateRangeForPeriod, formatDisplayDate, getTodayDateString } from '../../utils/date';
 import { generateTransactionsCsv, downloadCsvFile } from '../../services/export/csvExport';
-import {
-  BarChart3,
-  Download,
-  Calendar,
-  Award,
-  AlertCircle,
-  FileSpreadsheet,
-} from 'lucide-react';
+import { Download, Award, BarChart3 } from 'lucide-react';
 
 export const ReportsPage: React.FC = () => {
   const [period, setPeriod] = useState<FilterPeriod>('this-month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
-  const [dateError, setDateError] = useState<string | null>(null);
-
-  // Validate custom date range
-  const handleStartDateChange = (val: string) => {
-    setCustomStart(val);
-    if (customEnd && val > customEnd) {
-      setDateError('Start date cannot be after end date.');
-    } else {
-      setDateError(null);
-    }
-  };
-
-  const handleEndDateChange = (val: string) => {
-    setCustomEnd(val);
-    if (customStart && customStart > val) {
-      setDateError('Start date cannot be after end date.');
-    } else {
-      setDateError(null);
-    }
-  };
-
-  // Compute active date range
-  const activeRange = useMemo(() => {
-    return getDateRangeForPeriod(period, customStart, customEnd);
-  }, [period, customStart, customEnd]);
 
   const { transactions, allTransactions } = useTransactions({
     period,
-    customStartDate: dateError ? undefined : customStart,
-    customEndDate: dateError ? undefined : customEnd,
+    customStartDate: customStart,
+    customEndDate: customEnd,
   });
 
   const { categoriesMap } = useCategories();
 
-  const summary = useMemo(() => {
-    return calculateFinancialSummary(transactions, categoriesMap);
-  }, [transactions, categoriesMap]);
+  const summary = useMemo(
+    () => calculateFinancialSummary(transactions, categoriesMap),
+    [transactions, categoriesMap]
+  );
 
-  const dailySpending = useMemo(() => {
-    return calculateDailySpending(transactions);
-  }, [transactions]);
+  const dailySpending = useMemo(
+    () => calculateDailySpending(transactions),
+    [transactions]
+  );
 
-  const allSummary = useMemo(() => {
-    return calculateFinancialSummary(allTransactions, categoriesMap);
-  }, [allTransactions, categoriesMap]);
+  const allSummary = useMemo(
+    () => calculateFinancialSummary(allTransactions, categoriesMap),
+    [allTransactions, categoriesMap]
+  );
 
-  const periods: Array<{ id: FilterPeriod; label: string }> = [
-    { id: 'this-week', label: 'Weekly' },
-    { id: 'this-month', label: 'Monthly' },
-    { id: 'last-month', label: 'Last Month' },
-    { id: 'this-year', label: 'Yearly' },
-    { id: 'all', label: 'All Time' },
-    { id: 'custom', label: 'Custom Range' },
-  ];
+  const avgDailyOutflowPaise = useMemo(() => {
+    if (dailySpending.length === 0 || summary.totalExpenses === 0) return 0;
+    return Math.round(summary.totalExpenses / dailySpending.length);
+  }, [dailySpending.length, summary.totalExpenses]);
 
   const handleExportReport = () => {
+    if (transactions.length === 0) {
+      showToast({
+        type: 'info',
+        title: 'No Records to Export',
+        description: 'No transactions exist in the selected reporting period.',
+      });
+      return;
+    }
     const csv = generateTransactionsCsv(transactions);
-    const rangeTag =
-      period === 'custom' && customStart && customEnd
-        ? `${customStart}-to-${customEnd}`
-        : period;
-    downloadCsvFile(csv, `financial-report-${rangeTag}.csv`);
+    downloadCsvFile(csv, `financial-report-${period}.csv`);
+    showToast({
+      type: 'success',
+      title: 'Report Exported',
+      description: `Exported ${transactions.length} record(s) to CSV.`,
+    });
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* Top Filter and Export Bar */}
-      <Card className="p-4 sm:p-5">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-cyan-400" />
-              <span>Financial Reports & Analytics</span>
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Comprehensive cash flow distributions and categorical trend models
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
-              {periods.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => {
-                    setPeriod(p.id);
-                    if (p.id === 'custom' && !customStart) {
-                      setCustomStart(activeRange.startDate);
-                      setCustomEnd(activeRange.endDate);
-                    }
-                  }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                    period === p.id
-                      ? 'bg-cyan-500 text-white font-semibold shadow-sm'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<Download className="w-4 h-4" />}
-              onClick={handleExportReport}
-              disabled={transactions.length === 0}
-            >
-              Export Report CSV
-            </Button>
-          </div>
-        </div>
-
-        {/* Custom Date Range Picker Toolbar */}
-        {period === 'custom' && (
-          <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
-            <div className="flex flex-wrap items-center gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-cyan-400" />
-                <span className="font-medium text-slate-300">From Date:</span>
-                <input
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => handleStartDateChange(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-slate-300">To Date:</span>
-                <input
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => handleEndDateChange(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-                />
-              </div>
-
-              <span className="text-[11px] text-slate-400">
-                ({transactions.length} record{transactions.length !== 1 ? 's' : ''} in range)
-              </span>
-            </div>
-
-            {dateError && (
-              <p className="text-xs text-rose-400 flex items-center gap-1.5 pt-1 font-medium">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{dateError}</span>
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Active Range Banner */}
-        <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
-          <span>
-            Active Reporting Period:{' '}
-            <span className="text-slate-200 font-medium">
-              {formatDisplayDate(activeRange.startDate)} to {formatDisplayDate(activeRange.endDate)}
-            </span>
-          </span>
-          <Badge variant="cyan" size="sm">
-            {transactions.length} Transactions
-          </Badge>
-        </div>
-      </Card>
+    <div className="space-y-5 max-w-7xl mx-auto">
+      {/* Period Selector & CSV Export */}
+      <PeriodFilterBar
+        period={period}
+        onPeriodChange={setPeriod}
+        customStart={customStart}
+        customEnd={customEnd}
+        onCustomStartChange={setCustomStart}
+        onCustomEndChange={setCustomEnd}
+        rightSlot={
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<Download className="w-3.5 h-3.5" />}
+            onClick={handleExportReport}
+          >
+            Export Report CSV
+          </Button>
+        }
+      />
 
       {/* High-level Summary Highlights */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="p-4 border border-emerald-500/20">
-          <p className="text-xs text-slate-400">Total Inflow (Period)</p>
-          <p className="text-xl font-bold font-mono text-emerald-400 mt-1">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <Card className="p-4">
+          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+            Period Inflow
+          </p>
+          <p className="text-lg sm:text-xl font-bold font-mono text-emerald-400 tabular-nums mt-1.5">
             {formatINR(summary.totalIncome)}
           </p>
-          <p className="text-[11px] text-slate-500 mt-1">From all income streams</p>
+          <p className="text-[11px] text-slate-500 mt-1">All recorded credits</p>
         </Card>
 
-        <Card className="p-4 border border-rose-500/20">
-          <p className="text-xs text-slate-400">Total Outflow (Period)</p>
-          <p className="text-xl font-bold font-mono text-rose-400 mt-1">
+        <Card className="p-4">
+          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+            Period Outflow
+          </p>
+          <p className="text-lg sm:text-xl font-bold font-mono text-rose-400 tabular-nums mt-1.5">
             {formatINR(summary.totalExpenses)}
           </p>
-          <p className="text-[11px] text-slate-500 mt-1">Total expenditures incurred</p>
+          <p className="text-[11px] text-slate-500 mt-1">Total expenses incurred</p>
         </Card>
 
-        <Card className="p-4 border border-cyan-500/20">
-          <p className="text-xs text-slate-400">Net Surplus / Savings</p>
+        <Card className="p-4">
+          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+            Net Cash Flow
+          </p>
           <p
-            className={`text-xl font-bold font-mono mt-1 ${
-              summary.netBalance >= 0 ? 'text-cyan-400' : 'text-rose-400'
+            className={`text-lg sm:text-xl font-bold font-mono tabular-nums mt-1.5 ${
+              summary.netBalance >= 0 ? 'text-cyan-300' : 'text-rose-400'
             }`}
           >
             {formatINR(summary.netBalance)}
           </p>
-          <p className="text-[11px] text-slate-500 mt-1">
+          <p className="text-[11px] text-slate-500 mt-1 tabular-nums">
             Savings rate: {summary.savingsRate}%
+          </p>
+        </Card>
+
+        <Card className="p-4">
+          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+            Avg / Active Day
+          </p>
+          <p className="text-lg sm:text-xl font-bold font-mono text-white tabular-nums mt-1.5">
+            {formatINR(avgDailyOutflowPaise)}
+          </p>
+          <p className="text-[11px] text-slate-500 mt-1 tabular-nums">
+            Across {dailySpending.length} active day{dailySpending.length === 1 ? '' : 's'}
           </p>
         </Card>
       </div>
 
       {/* Daily Spending Trend Chart */}
-      <Card className="p-5">
-        <CardHeader className="flex items-center justify-between">
+      <Card>
+        <CardHeader>
           <div>
             <CardTitle>Daily Expense Velocity</CardTitle>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Day-by-day expenditure pattern across the selected reporting period
-            </p>
+            <CardDescription>
+              Day-by-day spending trajectory across the selected reporting period
+            </CardDescription>
           </div>
           <Badge variant="cyan" size="sm">
-            {dailySpending.length} Days Active
+            {dailySpending.length} Active Day{dailySpending.length === 1 ? '' : 's'}
           </Badge>
         </CardHeader>
 
-        <div className="mt-3">
-          <TrendAreaChart data={dailySpending} />
-        </div>
+        <TrendAreaChart data={dailySpending} />
       </Card>
 
       {/* Monthly Comparative Trends & Category Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         <div className="lg:col-span-7">
-          <Card className="p-5 h-full">
-            <CardHeader className="flex items-center justify-between">
+          <Card className="h-full">
+            <CardHeader>
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <span>Cash Flow Progression</span>
-                  <Badge variant="slate" size="sm">All-Time View</Badge>
-                </CardTitle>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Multi-month cash flow balance and expenditure trajectories across entire history
-                </p>
+                <CardTitle>Income vs. Expense Progression</CardTitle>
+                <CardDescription>
+                  Multi-month cash flow balance and expenditure history
+                </CardDescription>
               </div>
             </CardHeader>
-            <div className="mt-2">
-              <IncomeExpenseBarChart data={allSummary.monthlyTrend} />
-            </div>
+            <IncomeExpenseBarChart data={allSummary.monthlyTrend} />
           </Card>
         </div>
 
         <div className="lg:col-span-5">
-          <Card className="p-5 h-full flex flex-col justify-between">
-            <CardHeader className="flex items-center justify-between">
+          <Card className="h-full flex flex-col">
+            <CardHeader>
               <div>
-                <CardTitle>Category Distribution</CardTitle>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Proportional share of expenditures in active period
-                </p>
+                <CardTitle>Category Share</CardTitle>
+                <CardDescription>
+                  Proportional breakdown for the selected period
+                </CardDescription>
               </div>
             </CardHeader>
-            <div className="mt-2 flex-1">
+            <div className="flex-1 flex items-center justify-center">
               <CategoryPieChart
                 data={summary.categoryBreakdown}
                 totalExpenses={summary.totalExpenses}
@@ -288,63 +197,119 @@ export const ReportsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Highest Spending Categories Ranking Table */}
+      {/* Highest Spending Categories Ranking */}
       <Card className="p-0 overflow-hidden">
-        <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+        <div className="px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Award className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-sm font-bold text-white">Expense Category Ranking</h3>
+            <h3 className="text-sm font-semibold text-white">Expense Category Ranking</h3>
           </div>
-          <span className="text-xs text-slate-400 font-mono">
-            Sorted by total spending in period
+          <span className="text-[11px] text-slate-400 font-mono">
+            Sorted by total spend
           </span>
         </div>
 
         {summary.categoryBreakdown.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-500">
-            No expense records found for this reporting period.
-          </div>
+          <EmptyState
+            compact
+            icon={<BarChart3 className="w-5 h-5" />}
+            title="No Category Expenses in Period"
+            description="Select another reporting period or record expense transactions to view category rankings."
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-900/80 text-slate-400 font-mono text-[10px] uppercase border-b border-white/5">
-                <tr>
-                  <th className="py-3 px-4">Rank</th>
-                  <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">Transaction Count</th>
-                  <th className="py-3 px-4 text-right">Total Amount (INR)</th>
-                  <th className="py-3 px-4 text-right">Spending Share</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {summary.categoryBreakdown.map((item, idx) => (
-                  <tr key={item.category} className="hover:bg-slate-800/40 transition">
-                    <td className="py-3 px-4 font-mono text-slate-500 font-bold">
-                      #{idx + 1}
-                    </td>
-                    <td className="py-3 px-4 font-semibold text-slate-200">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full inline-block"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span>{item.category}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-slate-400 font-mono">
-                      {item.count} transaction{item.count !== 1 ? 's' : ''}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-rose-400">
-                      {formatINR(item.amount)}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono text-cyan-400">
-                      {item.percentage}%
-                    </td>
+          <>
+            {/* Desktop Table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#090E18] text-slate-400 font-mono text-[10px] uppercase border-b border-white/[0.06]">
+                  <tr>
+                    <th className="py-3 px-4">Rank</th>
+                    <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4">Entries</th>
+                    <th className="py-3 px-4 w-48">Distribution</th>
+                    <th className="py-3 px-4 text-right">Amount (INR)</th>
+                    <th className="py-3 px-4 text-right">Share</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-white/[0.05]">
+                  {summary.categoryBreakdown.map((item, idx) => {
+                    const cat = categoriesMap.get(item.category);
+                    return (
+                      <tr key={item.category} className="hover:bg-slate-800/35 transition">
+                        <td className="py-3 px-4 font-mono text-slate-500 font-bold tabular-nums">
+                          #{idx + 1}
+                        </td>
+                        <td className="py-3 px-4 font-semibold text-slate-100">
+                          <div className="flex items-center gap-2.5">
+                            <CategoryIcon name={cat?.icon} color={item.color} size="sm" />
+                            <span>{item.category}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-slate-400 font-mono tabular-nums">
+                          {item.count} tx{item.count === 1 ? '' : 's'}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${item.percentage}%`, backgroundColor: item.color }}
+                            />
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-rose-400 tabular-nums">
+                          {formatINR(item.amount)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-cyan-300 tabular-nums">
+                          {item.percentage}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Ranking List */}
+            <div className="sm:hidden divide-y divide-white/[0.05]">
+              {summary.categoryBreakdown.map((item, idx) => {
+                const cat = categoriesMap.get(item.category);
+                return (
+                  <div key={item.category} className="p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-xs font-mono text-slate-500 font-bold">
+                          #{idx + 1}
+                        </span>
+                        <CategoryIcon name={cat?.icon} color={item.color} size="sm" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-100 truncate">
+                            {item.category}
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {item.count} tx{item.count === 1 ? '' : 's'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold font-mono text-rose-400 tabular-nums">
+                          {formatINR(item.amount)}
+                        </p>
+                        <p className="text-[11px] font-mono text-cyan-300 tabular-nums">
+                          {item.percentage}%
+                        </p>
+                      </div>
+                    </div>
+                    <div className="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${item.percentage}%`, backgroundColor: item.color }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </Card>
     </div>

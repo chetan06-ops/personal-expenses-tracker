@@ -1,6 +1,4 @@
 import { z } from 'zod';
-import { isValidCalendarDate } from '../../utils/date';
-import { VALID_INR_AMOUNT_REGEX } from '../../utils/currency';
 
 export const transactionFormSchema = z.object({
   type: z.enum(['income', 'expense'], {
@@ -9,23 +7,20 @@ export const transactionFormSchema = z.object({
   amount: z
     .union([z.number(), z.string()])
     .refine((val) => val !== '' && val !== null && val !== undefined, {
-      message: 'Amount is required and cannot be empty (TC-03)',
+      message: 'Amount is required and cannot be empty',
     })
     .transform((val) => {
-      if (typeof val === 'number') {
-        return val.toString();
+      if (typeof val === 'string') {
+        const clean = val.trim().replace(/,/g, '');
+        return parseFloat(clean);
       }
-      return val.trim().replace(/,/g, '');
+      return val;
     })
-    .refine((val) => VALID_INR_AMOUNT_REGEX.test(val), {
-      message: 'Amount must be a valid number greater than zero with at most 2 decimal places (TC-04 / TC-05)',
+    .refine((val) => !isNaN(val), {
+      message: 'Amount must be a valid number',
     })
-    .transform((val) => parseFloat(val))
-    .refine((val) => !isNaN(val) && val > 0, {
-      message: 'Amount must be greater than zero (TC-04)',
-    })
-    .refine((val) => val * 100 <= Number.MAX_SAFE_INTEGER, {
-      message: 'Amount exceeds safe transaction limit',
+    .refine((val) => val > 0, {
+      message: 'Amount must be greater than zero',
     }),
   category: z
     .string()
@@ -33,9 +28,7 @@ export const transactionFormSchema = z.object({
     .min(1, 'Category is required'),
   date: z
     .string()
-    .refine(isValidCalendarDate, {
-      message: 'Date must be a valid calendar date in YYYY-MM-DD format',
-    }),
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in valid format (YYYY-MM-DD)'),
   description: z
     .string()
     .max(255, 'Description cannot exceed 255 characters')
@@ -49,26 +42,18 @@ export const budgetFormSchema = z.object({
   category: z.string().trim().min(1, 'Category is required'),
   limit: z
     .union([z.number(), z.string()])
-    .refine((val) => val !== '' && val !== null && val !== undefined, {
-      message: 'Budget limit is required and cannot be empty',
-    })
     .transform((val) => {
-      if (typeof val === 'number') return val.toString();
-      return val.trim().replace(/,/g, '');
+      if (typeof val === 'string') {
+        return parseFloat(val.trim().replace(/,/g, ''));
+      }
+      return val;
     })
-    .refine((val) => VALID_INR_AMOUNT_REGEX.test(val), {
-      message: 'Budget limit must be a positive numeric value with at most 2 decimal places',
-    })
-    .transform((val) => parseFloat(val))
     .refine((val) => !isNaN(val) && val > 0, {
-      message: 'Budget limit must be greater than zero',
-    })
-    .refine((val) => val * 100 <= Number.MAX_SAFE_INTEGER, {
-      message: 'Budget limit exceeds safe value limit',
+      message: 'Budget limit must be a positive number',
     }),
   month: z
     .string()
-    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Month must be in YYYY-MM format between 01 and 12'),
+    .regex(/^\d{4}-\d{2}$/, 'Month must be in YYYY-MM format'),
 });
 
 export type BudgetFormData = z.infer<typeof budgetFormSchema>;

@@ -4,37 +4,18 @@
  * ₹1.00 = 100 paise.
  */
 
-// Strict pattern for INR currency amounts: positive numbers with at most 2 decimal places
-export const VALID_INR_AMOUNT_REGEX = /^\d+(\.\d{1,2})?$/;
-
-/**
- * Validates whether a given string is a valid positive INR currency amount.
- * Rejects empty values, non-numeric strings, negative numbers, multiple decimals,
- * trailing characters, and values exceeding Number.MAX_SAFE_INTEGER in paise.
- */
-export function isValidAmountString(val: string): boolean {
-  if (!val || typeof val !== 'string') return false;
-  const clean = val.trim().replace(/,/g, '');
-  if (!VALID_INR_AMOUNT_REGEX.test(clean)) return false;
-  const num = parseFloat(clean);
-  if (isNaN(num) || num <= 0) return false;
-  if (num * 100 > Number.MAX_SAFE_INTEGER) return false;
-  return true;
-}
-
 /**
  * Converts rupees (number or string representation) to integer paise.
- * Properly handles decimal values with precise rounding to 2 decimal places.
+ * Properly handles decimal values with precise rounding.
  */
 export function rupeesToPaise(rupees: number | string): number {
   if (typeof rupees === 'string') {
     const clean = rupees.trim().replace(/,/g, '');
-    if (!VALID_INR_AMOUNT_REGEX.test(clean)) return 0;
     const num = parseFloat(clean);
-    if (isNaN(num) || num <= 0) return 0;
+    if (isNaN(num)) return 0;
     return Math.round(num * 100);
   }
-  if (typeof rupees !== 'number' || isNaN(rupees) || rupees <= 0) return 0;
+  if (isNaN(rupees)) return 0;
   return Math.round(rupees * 100);
 }
 
@@ -42,7 +23,7 @@ export function rupeesToPaise(rupees: number | string): number {
  * Converts integer paise back to rupees as a standard number.
  */
 export function paiseToRupees(paise: number): number {
-  if (typeof paise !== 'number' || isNaN(paise)) return 0;
+  if (isNaN(paise)) return 0;
   return paise / 100;
 }
 
@@ -59,19 +40,21 @@ export function formatINR(
 ): string {
   const { showDecimals = true, compact = false, includeSymbol = true } = options || {};
   const rupees = paiseToRupees(paise);
+  const sign = rupees < 0 ? '-' : '';
+  const absRupees = Math.abs(rupees);
 
-  if (compact && Math.abs(rupees) >= 10000000) {
+  if (compact && absRupees >= 10000000) {
     // Crores
-    const cr = (rupees / 10000000).toFixed(2);
-    return `${includeSymbol ? '₹' : ''}${cr} Cr`;
-  } else if (compact && Math.abs(rupees) >= 100000) {
+    const cr = (absRupees / 10000000).toFixed(2);
+    return `${sign}${includeSymbol ? '₹' : ''}${cr} Cr`;
+  } else if (compact && absRupees >= 100000) {
     // Lakhs
-    const lk = (rupees / 100000).toFixed(2);
-    return `${includeSymbol ? '₹' : ''}${lk} L`;
-  } else if (compact && Math.abs(rupees) >= 1000) {
+    const lk = (absRupees / 100000).toFixed(2);
+    return `${sign}${includeSymbol ? '₹' : ''}${lk} L`;
+  } else if (compact && absRupees >= 1000) {
     // Thousands
-    const k = (rupees / 1000).toFixed(1);
-    return `${includeSymbol ? '₹' : ''}${k}k`;
+    const k = (absRupees / 1000).toFixed(1);
+    return `${sign}${includeSymbol ? '₹' : ''}${k}k`;
   }
 
   const formatter = new Intl.NumberFormat('en-IN', {
