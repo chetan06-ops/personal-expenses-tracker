@@ -7,7 +7,7 @@ export const transactionFormSchema = z.object({
   amount: z
     .union([z.number(), z.string()])
     .refine((val) => val !== '' && val !== null && val !== undefined, {
-      message: 'Amount is required and cannot be empty (TC-03)',
+      message: 'Amount is required and cannot be empty',
     })
     .transform((val) => {
       if (typeof val === 'string') {
@@ -17,10 +17,10 @@ export const transactionFormSchema = z.object({
       return val;
     })
     .refine((val) => !isNaN(val), {
-      message: 'Amount must be a valid number (TC-05)',
+      message: 'Amount must be a valid number',
     })
     .refine((val) => val > 0, {
-      message: 'Amount must be greater than zero (TC-04)',
+      message: 'Amount must be greater than zero',
     }),
   category: z
     .string()

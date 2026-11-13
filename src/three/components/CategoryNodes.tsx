@@ -73,18 +73,18 @@ export const CategoryNodes: React.FC<CategoryNodesProps> = ({ categories }) => {
               />
             </mesh>
 
-            {/* Orbit Label / Tooltip via Drei Html */}
+            {/* Orbit Label / Tooltip via Drei Html — kept below sticky header (z-30) and modals (z-50) */}
             <Html
               position={[0, nodeScale + 0.3, 0]}
               center
               distanceFactor={8}
-              zIndexRange={[100, 0]}
+              zIndexRange={[10, 0]}
             >
               <div
                 className={`transition-all duration-200 pointer-events-none select-none rounded-lg px-2.5 py-1 text-center whitespace-nowrap backdrop-blur-md border ${
                   isHovered
-                    ? 'bg-slate-900/90 border-cyan-400 shadow-lg shadow-cyan-500/20 scale-110'
-                    : 'bg-slate-900/60 border-white/10 opacity-80'
+                    ? 'bg-slate-900/95 border-cyan-400 shadow-lg shadow-cyan-500/20 scale-105'
+                    : 'bg-slate-900/75 border-white/10 opacity-85'
                 }`}
               >
                 <div className="flex items-center gap-1.5 justify-center">

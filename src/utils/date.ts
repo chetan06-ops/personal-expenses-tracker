@@ -118,7 +118,11 @@ export function getMonthKey(date: Date = new Date()): string {
  * Formats YYYY-MM into a friendly label like "October 2026"
  */
 export function formatMonthLabel(monthKey: string): string {
+  if (!monthKey || !/^\d{4}-\d{2}$/.test(monthKey)) {
+    return monthKey || 'Invalid Month';
+  }
   const [year, month] = monthKey.split('-');
   const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+  if (isNaN(date.getTime())) return monthKey;
   return new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric' }).format(date);
 }

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useId } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -19,6 +19,8 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   maxWidth = 'md',
 }) => {
+  const titleId = useId();
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
@@ -46,10 +48,10 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/70 backdrop-blur-md transition-opacity"
+        className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -57,31 +59,35 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Modal Dialog Card */}
       <div
         className={cn(
-          'relative w-full rounded-2xl glass-card bg-[#0F172A]/95 border border-slate-700/80 p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-200',
+          'relative w-full max-h-[90vh] flex flex-col rounded-2xl bg-[#0D131F] border border-slate-700/70 shadow-elevated z-10 overflow-hidden',
           maxWidths[maxWidth]
         )}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
       >
         {/* Header */}
-        <div className="flex items-start justify-between pb-4 border-b border-white/5">
-          <div>
-            <h2 className="text-lg font-bold text-slate-100">{title}</h2>
+        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-white/[0.06] shrink-0">
+          <div className="min-w-0">
+            <h2 id={titleId} className="text-base sm:text-lg font-bold text-slate-100 leading-snug">
+              {title}
+            </h2>
             {description && (
-              <p className="text-xs text-slate-400 mt-1">{description}</p>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">{description}</p>
             )}
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="rounded-lg p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 transition shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
             aria-label="Close dialog"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Content Body */}
-        <div className="pt-4">{children}</div>
+        {/* Scrollable Content Body */}
+        <div className="p-5 overflow-y-auto">{children}</div>
       </div>
     </div>
   );

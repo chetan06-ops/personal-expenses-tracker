@@ -10,6 +10,18 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
+          'charts-vendor': ['recharts'],
+          'db-vendor': ['dexie', 'dexie-react-hooks'],
+        },
+      },
+    },
+  },
   // @ts-expect-error vitest config
   test: {
     globals: true,

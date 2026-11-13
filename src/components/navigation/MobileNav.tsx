@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavTab } from './Sidebar';
 import {
   LayoutDashboard,
@@ -8,10 +8,11 @@ import {
   FolderTree,
   Settings,
   X,
-  PlusCircle,
+  Plus,
   GraduationCap,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { cn } from '../../utils/cn';
 
 interface MobileNavProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ interface MobileNavProps {
   onSelectTab: (tab: NavTab) => void;
   onOpenQuickAdd: () => void;
   onOpenAcademicModal: () => void;
+  budgetAlertCount?: number;
 }
 
 export const MobileNav: React.FC<MobileNavProps> = ({
@@ -29,90 +31,119 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   onSelectTab,
   onOpenQuickAdd,
   onOpenAcademicModal,
+  budgetAlertCount = 0,
 }) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
-  const navItems: Array<{ tab: NavTab; label: string; icon: React.ReactNode }> = [
-    { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { tab: 'transactions', label: 'Transactions', icon: <Receipt className="w-5 h-5" /> },
-    { tab: 'budgets', label: 'Budgets', icon: <PiggyBank className="w-5 h-5" /> },
-    { tab: 'reports', label: 'Reports & Analytics', icon: <BarChart3 className="w-5 h-5" /> },
-    { tab: 'categories', label: 'Categories', icon: <FolderTree className="w-5 h-5" /> },
-    { tab: 'settings', label: 'Settings & Backup', icon: <Settings className="w-5 h-5" /> },
+  const navItems: Array<{ tab: NavTab; label: string; icon: React.ReactNode; badge?: number }> = [
+    { tab: 'dashboard', label: 'Overview', icon: <LayoutDashboard className="w-4 h-4" /> },
+    { tab: 'transactions', label: 'Transactions', icon: <Receipt className="w-4 h-4" /> },
+    {
+      tab: 'budgets',
+      label: 'Budgets',
+      icon: <PiggyBank className="w-4 h-4" />,
+      badge: budgetAlertCount > 0 ? budgetAlertCount : undefined,
+    },
+    { tab: 'reports', label: 'Reports & Insights', icon: <BarChart3 className="w-4 h-4" /> },
+    { tab: 'categories', label: 'Categories', icon: <FolderTree className="w-4 h-4" /> },
+    { tab: 'settings', label: 'Settings & Data', icon: <Settings className="w-4 h-4" /> },
   ];
 
   return (
-    <div className="fixed inset-0 z-50 lg:hidden">
+    <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Mobile Navigation">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/75 backdrop-blur-sm"
         onClick={onClose}
+        aria-hidden="true"
       />
 
       {/* Drawer */}
-      <div className="relative w-72 max-w-[80vw] h-full bg-[#070A12] border-r border-slate-800 p-5 flex flex-col justify-between shadow-2xl animate-in slide-in-from-left duration-200">
+      <div className="relative w-72 max-w-[82vw] h-full bg-[#090E18] border-r border-white/10 p-4 flex flex-col justify-between shadow-elevated">
         <div>
-          {/* Header */}
-          <div className="flex items-center justify-between pb-5 border-b border-white/10">
+          <div className="flex items-center justify-between pb-4 border-b border-white/[0.06]">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center font-bold text-white">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-sky-600 flex items-center justify-center font-black text-slate-950">
                 ₹
               </div>
-              <span className="font-bold text-sm text-white">Expenses Tracker</span>
+              <div>
+                <span className="font-bold text-sm text-white block leading-tight">
+                  Expenses Tracker
+                </span>
+                <span className="text-[10px] text-slate-400">Personal Finance OS</span>
+              </div>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="p-1 rounded-lg text-slate-400 hover:text-white"
+              aria-label="Close navigation menu"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Quick Add */}
           <div className="my-4">
             <Button
               variant="primary"
               size="sm"
               className="w-full justify-center"
-              leftIcon={<PlusCircle className="w-4 h-4" />}
+              leftIcon={<Plus className="w-4 h-4" />}
               onClick={() => {
                 onClose();
                 onOpenQuickAdd();
               }}
             >
-              Add Transaction
+              New Transaction
             </Button>
           </div>
 
-          {/* Links */}
           <nav className="space-y-1">
             {navItems.map((item) => {
               const isActive = currentTab === item.tab;
               return (
                 <button
                   key={item.tab}
+                  type="button"
                   onClick={() => {
                     onSelectTab(item.tab);
                     onClose();
                   }}
-                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-medium transition ${
+                  aria-current={isActive ? 'page' : undefined}
+                  className={cn(
+                    'w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition',
                     isActive
-                      ? 'bg-cyan-500/15 text-cyan-300 border-l-2 border-cyan-400'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                  }`}
+                      ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/25 font-semibold'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                  )}
                 >
-                  <span className={isActive ? 'text-cyan-400' : 'text-slate-400'}>
-                    {item.icon}
+                  <span className="flex items-center gap-3">
+                    <span className={isActive ? 'text-cyan-400' : 'text-slate-400'}>
+                      {item.icon}
+                    </span>
+                    <span>{item.label}</span>
                   </span>
-                  <span>{item.label}</span>
+                  {item.badge !== undefined && (
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      {item.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </nav>
         </div>
 
-        {/* Academic link */}
-        <div className="pt-4 border-t border-white/10 space-y-2">
+        <div className="pt-4 border-t border-white/[0.06] space-y-2">
           <Button
             variant="glass"
             size="sm"
@@ -126,7 +157,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
             MM(DU) Mullana Details
           </Button>
           <div className="text-[10px] text-slate-500 font-mono text-center">
-            BCA-308 • Session 2025–2028
+            BCA-308 • Local-First IndexedDB
           </div>
         </div>
       </div>

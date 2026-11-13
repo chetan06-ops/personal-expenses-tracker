@@ -1,0 +1,24 @@
+{
+  "$schema": "https://opengsd.net/schemas/config.v1.json",
+  "project": {
+    "name": "personal-expenses-tracker",
+    "version": "1.0.0",
+    "description": "3D Financial Intelligence Application — Local-first personal expenses and budget manager"
+  },
+  "mode": "interactive",
+  "granularity": "standard",
+  "model_profile": "quality",
+  "commit_docs": true,
+  "workflow": {
+    "research": true,
+    "plan_check": true,
+    "verifier": true,
+    "parallelization": false
+  },
+  "conventions": {
+    "currency": "INR",
+    "precision": "paise (integer minor units)",
+    "storage": "IndexedDB via Dexie.js",
+    "visualization": "Three.js / React Three Fiber with Orbit2D SVG fallback"
+  }
+}

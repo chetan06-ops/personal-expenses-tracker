@@ -101,12 +101,12 @@ export async function seedAcademicData(): Promise<void> {
   const now = new Date().toISOString();
   const txs: Transaction[] = ACADEMIC_SAMPLE_TRANSACTIONS.map((tx, idx) => ({
     ...tx,
-    id: `seed_tx_${Date.now()}_${idx + 1}`,
+    id: `seed_acad_tx_${idx + 1}`,
     createdAt: now,
     updatedAt: now,
   }));
 
-  await db.transactions.bulkAdd(txs);
+  await db.transactions.bulkPut(txs);
 
   // Seed sample budgets
   const sampleBudgets: Budget[] = [
@@ -145,4 +145,5 @@ export async function seedAcademicData(): Promise<void> {
   ];
 
   await db.budgets.bulkPut(sampleBudgets);
+  await db.settings.put({ key: 'seedInitialized', value: true });
 }

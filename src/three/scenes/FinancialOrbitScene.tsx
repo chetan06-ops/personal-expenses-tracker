@@ -158,9 +158,13 @@ export const FinancialOrbitScene: React.FC<FinancialOrbitSceneProps> = ({
       </div>
 
       {/* Bottom Hint */}
-      <div className="absolute bottom-2 left-3 pointer-events-none text-[10px] text-slate-500 font-mono flex items-center gap-2">
+      <div className="absolute bottom-2.5 left-3 pointer-events-none text-[10px] text-slate-400 font-mono flex items-center gap-2 bg-slate-950/60 px-2.5 py-1 rounded-full border border-white/[0.06]">
         <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-        <span>Interactive Financial Orbit • Drag to rotate</span>
+        <span>
+          {categoryBreakdown.length === 0
+            ? 'Central Core Active • Add expenses to map category nodes'
+            : 'Interactive Financial Orbit • Drag to rotate'}
+        </span>
       </div>
     </div>
   );

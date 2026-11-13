@@ -40,19 +40,21 @@ export function formatINR(
 ): string {
   const { showDecimals = true, compact = false, includeSymbol = true } = options || {};
   const rupees = paiseToRupees(paise);
+  const sign = rupees < 0 ? '-' : '';
+  const absRupees = Math.abs(rupees);
 
-  if (compact && Math.abs(rupees) >= 10000000) {
+  if (compact && absRupees >= 10000000) {
     // Crores
-    const cr = (rupees / 10000000).toFixed(2);
-    return `${includeSymbol ? '₹' : ''}${cr} Cr`;
-  } else if (compact && Math.abs(rupees) >= 100000) {
+    const cr = (absRupees / 10000000).toFixed(2);
+    return `${sign}${includeSymbol ? '₹' : ''}${cr} Cr`;
+  } else if (compact && absRupees >= 100000) {
     // Lakhs
-    const lk = (rupees / 100000).toFixed(2);
-    return `${includeSymbol ? '₹' : ''}${lk} L`;
-  } else if (compact && Math.abs(rupees) >= 1000) {
+    const lk = (absRupees / 100000).toFixed(2);
+    return `${sign}${includeSymbol ? '₹' : ''}${lk} L`;
+  } else if (compact && absRupees >= 1000) {
     // Thousands
-    const k = (rupees / 1000).toFixed(1);
-    return `${includeSymbol ? '₹' : ''}${k}k`;
+    const k = (absRupees / 1000).toFixed(1);
+    return `${sign}${includeSymbol ? '₹' : ''}${k}k`;
   }
 
   const formatter = new Intl.NumberFormat('en-IN', {

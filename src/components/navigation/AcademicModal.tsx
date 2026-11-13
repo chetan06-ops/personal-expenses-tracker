@@ -17,11 +17,11 @@ export const AcademicModal: React.FC<AcademicModalProps> = ({ isOpen, onClose })
       description="Official curriculum project documentation and credentials"
       maxWidth="lg"
     >
-      <div className="space-y-5 text-sm">
+      <div className="space-y-4 text-sm">
         {/* University Header */}
-        <div className="p-4 rounded-xl bg-gradient-to-r from-cyan-950/60 to-blue-950/60 border border-cyan-500/20 text-center">
-          <div className="w-12 h-12 rounded-full bg-cyan-500/20 text-cyan-400 mx-auto flex items-center justify-center mb-2 border border-cyan-400/30">
-            <Building2 className="w-6 h-6" />
+        <div className="p-4 rounded-xl bg-gradient-to-r from-cyan-950/50 to-sky-950/40 border border-cyan-500/20 text-center">
+          <div className="w-11 h-11 rounded-full bg-cyan-500/15 text-cyan-400 mx-auto flex items-center justify-center mb-2 border border-cyan-400/25">
+            <Building2 className="w-5 h-5" />
           </div>
           <h3 className="font-bold text-base text-slate-100">
             Maharishi Markandeshwar Institute of Computer Technology & Business Management
